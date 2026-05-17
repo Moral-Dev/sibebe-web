@@ -1,17 +1,40 @@
+const MAIN_SCRIPT_URL = (() => {
+    const script = document.currentScript || document.querySelector('script[src*="js/main.js"]');
+    return new URL(script?.getAttribute('src') || 'js/main.js', window.location.href);
+})();
+
+const SITE_BASE_PATH = MAIN_SCRIPT_URL.pathname.replace(/\/js\/main\.js$/, '').replace(/\/$/, '');
+
+const assetPath = (path) => {
+    const cleanPath = String(path).replace(/^\/+/, '');
+    return new URL(`../${cleanPath}`, MAIN_SCRIPT_URL).href;
+};
+
+const pagePath = (slug) => {
+    const isGitHubPagesProject = window.location.hostname.endsWith('github.io') && SITE_BASE_PATH;
+    if (isGitHubPagesProject) {
+        return slug === 'home' ? `${SITE_BASE_PATH}/` : `${SITE_BASE_PATH}/pages/${slug}.html`;
+    }
+
+    return slug === 'home' ? '/home' : `/${slug}`;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
     const currentPathSegment = currentPath.split('/').pop().replace(/\.html$/, '');
-    // Handle both / and /home as 'home' page
-    const currentPage = (currentPath === '/' || currentPath.endsWith('/home') || currentPath.endsWith('/index.html')) ? 'home' : currentPathSegment;
+    const isGitHubProjectHome = window.location.hostname.endsWith('github.io')
+        && SITE_BASE_PATH
+        && (currentPath === SITE_BASE_PATH || currentPath === `${SITE_BASE_PATH}/index.html`);
+    const currentPage = (currentPath === '/' || currentPath.endsWith('/home') || currentPath.endsWith('/index.html') || isGitHubProjectHome) ? 'home' : currentPathSegment;
     const navItems = [
-        { href: '/home', key: 'nav.home', label: 'Начало', activePages: ['home'] },
-        { href: '/about', key: 'nav.about', label: 'За нас', activePages: ['about'] },
-        { href: '/baby-center', key: 'nav.baby_center', label: 'Бебешки център', activePages: ['baby-center'] },
-        { href: '/academy', key: 'nav.academy', label: 'Академия за родители', activePages: ['academy'] },
-        { href: '/partners', key: 'nav.partners', label: 'Партньори', activePages: ['partners'] },
-        { href: '/gallery', key: 'nav.gallery', label: 'Галерия', activePages: ['gallery'] },
-        { href: '/shop', key: 'nav.shop', label: 'Магазин', activePages: ['shop'] },
-        { href: '/contact', key: 'nav.contact', label: 'Контакти', activePages: ['contact'] },
+        { href: pagePath('home'), key: 'nav.home', label: 'Начало', activePages: ['home'] },
+        { href: pagePath('about'), key: 'nav.about', label: 'За нас', activePages: ['about'] },
+        { href: pagePath('baby-center'), key: 'nav.baby_center', label: 'Бебешки център', activePages: ['baby-center'] },
+        { href: pagePath('academy'), key: 'nav.academy', label: 'Академия за родители', activePages: ['academy'] },
+        { href: pagePath('partners'), key: 'nav.partners', label: 'Партньори', activePages: ['partners'] },
+        { href: pagePath('gallery'), key: 'nav.gallery', label: 'Галерия', activePages: ['gallery'] },
+        { href: pagePath('shop'), key: 'nav.shop', label: 'Магазин', activePages: ['shop'] },
+        { href: pagePath('contact'), key: 'nav.contact', label: 'Контакти', activePages: ['contact'] },
     ];
 
     const renderLayout = () => {
@@ -48,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="container">
                 <nav>
                     <div class="logo">
-                        <a href="/home">
-                            <img src="/assets/icons/logo-purple.png" alt="SI BEBE">
+                        <a href="${pagePath('home')}">
+                            <img src="${assetPath('assets/icons/logo-purple.png')}" alt="SI BEBE">
                         </a>
                     </div>
                     <ul class="nav-links">
@@ -62,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </li>
                     </ul>
                     <div class="nav-actions">
-                        <a href="/contact#booking" class="btn" data-key="nav.book_now">Запиши час</a>
+                        <a href="${pagePath('contact')}#booking" class="btn" data-key="nav.book_now">Запиши час</a>
                     </div>
                     <button class="menu-toggle" type="button" aria-label="Отвори меню" aria-expanded="false">
                         <span></span>
@@ -105,6 +128,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     renderLayout();
+
+    document.querySelectorAll('[data-page-link]').forEach((link) => {
+        const page = link.getAttribute('data-page-link');
+        if (page) link.setAttribute('href', pagePath(page));
+    });
 
     const topBar = document.querySelector('.top-bar');
     const header = document.querySelector('header');
@@ -149,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLang = localStorage.getItem('lang') || 'bg';
 
     const updateContent = (lang) => {
-        fetch('/assets/lang.json')
+        fetch(assetPath('assets/lang.json'))
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.json();
@@ -574,7 +602,7 @@ async function fetchEvents() {
             const eventDate = parseEventDate(date);
             const resolvedStatus = status || (eventDate && eventDate < new Date() ? 'past' : 'upcoming');
             const displayDate = formatEventDate(eventDate, String(date));
-            const image = isLikelyImageUrl(url) ? getGalleryImageUrl(url) : '/images/missions.png';
+            const image = isLikelyImageUrl(url) ? getGalleryImageUrl(url) : assetPath('images/missions.png');
             const eventLinkHtml = url && !isLikelyImageUrl(url)
                 ? `<a href="${escapeHtml(url)}" class="event-link" target="_blank" rel="noopener">Виж повече</a>`
                 : '';
