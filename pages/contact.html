@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="bg-BG">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI BEBE - Контакти</title>
+    <link rel="icon" type="image/png" href="/assets/icons/favicon.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans:400,700|Montserrat:700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="site-header"></div>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1 data-key="nav.contact">Контакти</h1>
+            </div>
+        </section>
+
+        <section id="contact-info">
+            <div class="container">
+                <div class="grid">
+                    <div id="booking" class="card">
+                        <h2 data-key="nav.book_now" style="margin-bottom: 20px;">Запиши час</h2>
+                        <form id="booking-form" class="site-form">
+                            <div class="form-field">
+                                <label for="parent-first-name">Име на родител <span>*</span></label>
+                                <div class="form-row">
+                                    <input id="parent-first-name" type="text" name="parent_first_name" placeholder="Име" required>
+                                    <input type="text" name="parent_last_name" placeholder="Фамилия" required>
+                                </div>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="booking-email">Email <span>*</span></label>
+                                <input id="booking-email" type="email" name="email" placeholder="Email" required>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="booking-phone">Телефон <span>*</span></label>
+                                <input id="booking-phone" type="tel" name="phone" placeholder="+359" required>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="child-first-name">Име на дете <span>*</span></label>
+                                <div class="form-row">
+                                    <input id="child-first-name" type="text" name="child_first_name" placeholder="Име" required>
+                                    <input type="text" name="child_last_name" placeholder="Фамилия" required>
+                                </div>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="child-age">Възраст на дете <span>*</span></label>
+                                <select id="child-age" name="child_age" required>
+                                    <option value="">--- Избери ---</option>
+                                    <option value="1 година">1 година</option>
+                                    <option value="2 години">2 години</option>
+                                    <option value="3 години">3 години</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn">Запиши се</button>
+                        </form>
+                    </div>
+                    <div class="contact-details">
+                        <h2>Информация за контакт</h2>
+                        <div class="contact-detail-group">
+                            <h3>Адрес:</h3>
+                            <p>гр. Варна, ул. "Братя Миладинови" 68</p>
+                        </div>
+                        <div class="contact-detail-group">
+                            <h3>Телефон за връзка:</h3>
+                            <div class="copy-contact-list">
+                                <button type="button" class="copy-contact" data-copy="0879 919 779">0879 919 779</button>
+                                <span>или</span>
+                                <button type="button" class="copy-contact" data-copy="0882 915 978">0882 915 978</button>
+                            </div>
+                        </div>
+                        <div class="contact-detail-group">
+                            <h3>Имейл</h3>
+                            <button type="button" class="copy-contact" data-copy="sibebe.bg@gmail.com">sibebe.bg@gmail.com</button>
+                        </div>
+                        <div class="contact-detail-group">
+                            <h3>Работно време:</h3>
+                            <p>Понеделник – Петък (7:30– 18:30)</p>
+                            <p>Събота и Неделя 9:00 - 17:00</p>
+                        </div>
+                        <div class="contact-detail-group">
+                            <h3>Последвайте ни</h3>
+                            <div class="footer-social" aria-label="Social links">
+                                <a href="https://www.facebook.com/profile.php?id=61555541437681" target="_blank" aria-label="Facebook">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                                </a>
+                                <a href="https://www.instagram.com/sibebe_babyandparents_care/" target="_blank" aria-label="Instagram">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                                </a>
+                                <a href="mailto:sibebe.bg@gmail.com" aria-label="Email">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <div id="site-footer"></div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="bg-BG">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI BEBE - Партньори</title>
+    <link rel="icon" type="image/png" href="/assets/icons/favicon.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans:400,700|Montserrat:700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="site-header"></div>
+
+    <main>
+        <section class="page-header partners-hero">
+            <div class="container">
+                <h1 data-key="partners.hero_title">Заедно предлагаме най-доброто.</h1>
+            </div>
+        </section>
+
+        <section id="partners" class="partners-section">
+            <div class="container">
+                <div class="partners-grid">
+                    <div class="partners-list-block">
+                        <h2 data-key="partners.title">Партньори</h2>
+                        <div class="mission-divider" aria-hidden="true"></div>
+                        <ul class="partners-list">
+                            <li data-key="partners.medical">Медицински</li>
+                            <li data-key="partners.educational">Образователни</li>
+                            <li data-key="partners.brand">Бранд</li>
+                            <li data-key="partners.media">Медийни</li>
+                            <li data-key="partners.corporate">Корпоративни</li>
+                        </ul>
+                    </div>
+
+                    <div class="partners-form-block card">
+                        <h2 data-key="partners.form_title">Стани наш партньор</h2>
+                        <div class="mission-divider" aria-hidden="true"></div>
+                        <form id="partner-form" class="site-form partner-form">
+                            <div class="form-field">
+                                <label for="partner-first-name">Име и фамилия <span>*</span></label>
+                                <div class="form-row">
+                                    <input id="partner-first-name" type="text" name="first_name" placeholder="Име" required>
+                                    <input type="text" name="last_name" placeholder="Фамилия" required>
+                                </div>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="partner-company">Име на компания <span>*</span></label>
+                                <input id="partner-company" type="text" name="company" placeholder="Име на компания" required>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="partner-email">Email <span>*</span></label>
+                                <input id="partner-email" type="email" name="email" placeholder="Email" required>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="partner-phone">Телефон <span>*</span></label>
+                                <input id="partner-phone" type="tel" name="phone" placeholder="+359" required>
+                            </div>
+
+                            <button type="submit" class="btn">Изпрати</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="site-footer"></div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

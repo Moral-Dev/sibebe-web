@@ -1,0 +1,158 @@
+{
+  "bg": {
+    "nav": {
+      "home": "Начало",
+      "about": "За нас",
+      "baby_center": "Бебешки център",
+      "academy": "Академия за родители",
+      "partners": "Партньори",
+      "gallery": "Галерия",
+      "shop": "Магазин",
+      "contact": "Контакти",
+      "book_now": "Запиши час"
+    },
+    "home": {
+      "hero_title": "SI BEBE - всяко начало е изпълнено с обич и открития.",
+      "hero_text": "Добре дошли в нашето защитено пространство за най-малките. Тук бебетата опознават света чрез сетивата си, а родителите откриват подкрепа и споделеност. Съчетаваме грижата на семейството с експертизата на специалистите.",
+      "events_title": "Предстоящи събития",
+      "past_events_title": "Минали събития"
+    },
+    "about": {
+      "hero_title": "Стандарт в ранната грижа",
+      "hero_subtitle": "Място, където биологичните нужди и емоционалното спокойствие на детето са истински приоритет.",
+      "mission_title": "Нашата мисия",
+      "mission_subtitle": "Стандарт в ранната грижа",
+      "mission_text_1": "Мисията на <strong>SI BEBE</strong> е да създаде нов стандарт в ранната грижа, където биологичните нужди и емоционалното спокойствие на детето са приоритет. Ние се ангажираме да съхраним естествения ритъм на децата в периода на тяхното най-интензивно развитие (0–36 месеца).",
+      "mission_text_2": "Чрез съчетаване на експерти ранно детско развитие и защитена среда, ние осигуряваме плавен преход от семейния уют към първите социални стъпки. Нашата задача е да бъдем доверен партньор на родителите, предоставяйки им сигурност, че детето им е в пространство, което уважава неговата индивидуалност и подкрепя развитието на неговата нервна система.",
+      "vision_title": "Визия",
+      "vision_subtitle": "Щастливо детство чрез качество и уважение",
+      "vision_text": "Визията ни е SI BEBE да бъде еталон за професионална ранна грижа – място, в което успехът не се измерва с външна стимулация, а с вътрешното спокойствие и увереност на всяко дете. Стремим се да изградим общност от информирани родители и специалисти, които разбират, че качествената основа в първите 1000 дни е ключът към здравословното развитие на бъдещото поколение. Искаме SI BEBE да бъде символ на стандарт, in който човешкото присъствие, вниманието към детайла и безупречната етика формират средата на бъдещето.",
+      "goals_title": "Цели",
+      "goals_subtitle": "Стълбове на професионалната грижа",
+      "goal_1_title": "Устойчиво развитие на нервната система",
+      "goal_1_text": "Целта ни е да защитим децата от претоварване. Постигаме го чрез среда с контролирана стимулация, естествени материали и меки тонове. Избягваме силните изкуствени стимули, за да подпомогнем способността на детето да опознава света спокойно.",
+      "goal_2_title": "Изграждане на вътрешна увереност",
+      "goal_2_text": "Ние целим всяко дете да изгради трайно доверие в себе си и в света около него. Това се постига чрез малки групи, постоянен персонал и плавна, индивидуална адаптация, която изключва стреса от раздялата.",
+      "goal_3_title": "Индивидуален биологичен подход",
+      "goal_3_text": "В SIBEBE целим пълно синхронизиране на грижата с физиологията на бебето. Ние не налагаме изкуствени графици; нашата цел е да следваме индивидуалния ритъм на сън, хранене и активност на всяко дете.",
+      "goal_4_title": "Партньорство, базирано на прозрачност",
+      "goal_4_text": "Стремим се към пълна яснота в комуникацията с родителите. Нашата цел е да предоставяме детайлна обратна връзка за всеки етап от развитието на детето, превръщайки се в стабилна опора за семейството.",
+      "goal_5_title": "Високи хигиенни стандарти",
+      "goal_5_text": "Поддържаме микроклимат, който минимизира здравните рискове. Това включва безупречна дезинфекция, пречистване на въздуха и използване на материали, които осигуряват чиста и здравословна среда.",
+      "team_title": "Нашият екип",
+      "team_subtitle": "Експертна грижа с мисъл за бъдещето",
+      "team_text": "Вярваме, че ранното детско развитие изисква повече от просто внимание – то изисква научен подход, опитна ръка и топло сърце. Затова зад концепцията на нашия център стои екип от доказани специалисти, които обединяват усилията си в името на най-ценното: физическото и емоционално здраве на вашето дете.",
+      "team_1_title": "Специалисти по ранно детско развитие и педагози",
+      "team_1_text": "Специалисти, които превръщат всяко преживяване във възможност детето да открие света и собствените си заложби.",
+      "team_2_title": "Медицински персонал",
+      "team_2_text": "Безопасността, физическото здраве и благополучие са основата, върху която градим всичко останало.",
+      "team_3_title": "Терапевтичен панел",
+      "team_3_text": "Програмата ни е подсилена от работата на логопед и ерготерапевт, които следят за правилното езиково и моторно развитие.",
+      "reviews_title": "Отзиви от родители"
+    },
+    "baby_center": {
+      "title": "SI BEBE – Център за ранна грижа и развитие (0–36 месеца)",
+      "subtitle": "Мислим за емоциите, развитието и спокойствието на всяко дете.",
+      "intro": "Ние сме тясно специализиран бебешки център за почасово гледане на бебета и деца от 0 до 36 месеца.",
+      "pillar_1_title": "Биологичен ритъм, не график",
+      "pillar_1_text": "Адаптираме деня спрямо индивидуалните нужди на всяко дете от сън, храна и близост.",
+      "pillar_2_title": "Емоционална интелигентност",
+      "pillar_2_text": "Отнасяме се към бебето като към личност с право на глас и собствено темпо.",
+      "service_1": "Гледане на дете",
+      "service_2": "Абонаментни програми",
+      "service_3": "Тематични работилници"
+    },
+    "partners": {
+      "hero_title": "Заедно предлагаме най-доброто.",
+      "title": "Партньори",
+      "form_title": "Стани наш партньор",
+      "medical": "Медицински",
+      "educational": "Образователни",
+      "brand": "Бранд",
+      "media": "Медийни",
+      "corporate": "Корпоративни"
+    },
+    "shop": {
+      "hero_title": "В процес на изграждане",
+      "hero_text": "Скоро тук ще намерите подбрани играчки и помагала за вашето бебе."
+    }
+  },
+  "en": {
+    "nav": {
+      "home": "Home",
+      "about": "About Us",
+      "baby_center": "Baby Center",
+      "academy": "Parents Academy",
+      "partners": "Partners",
+      "gallery": "Gallery",
+      "shop": "Shop",
+      "contact": "Contact",
+      "book_now": "Book Now"
+    },
+    "home": {
+      "hero_title": "SI BEBE - every beginning is filled with love and discoveries.",
+      "hero_text": "Welcome to our protected space for the little ones. Here, babies explore the world through their senses, and parents find support and sharing. We combine family care with specialist expertise.",
+      "events_title": "Upcoming Events",
+      "past_events_title": "Past Events"
+    },
+    "about": {
+      "hero_title": "A Standard in Early Care",
+      "hero_subtitle": "A place where biological needs and emotional peace of the child are a true priority.",
+      "mission_title": "Our Mission",
+      "mission_subtitle": "A Standard in Early Care",
+      "mission_text_1": "<strong>SI BEBE</strong>'s mission is to create a new standard in early care, where the biological needs and emotional peace of the child are a priority. We are committed to preserving the natural rhythm of children during their most intensive development period (0–36 months).",
+      "mission_text_2": "By combining early childhood development experts and a protected environment, we ensure a smooth transition from family comfort to the first social steps. Our task is to be a trusted partner to parents, providing them with security that their child is in a space that respects their individuality and supports the development of their nervous system.",
+      "vision_title": "Vision",
+      "vision_subtitle": "Happy Childhood through Quality and Respect",
+      "vision_text": "Our vision is for SI BEBE to be a benchmark for professional early care – a place where success is not measured by external stimulation, but by the inner peace and confidence of each child. We strive to build a community of informed parents and specialists who understand that a quality foundation in the first 1000 days is the key to the healthy development of the future generation.",
+      "goals_title": "Goals",
+      "goals_subtitle": "Pillars of Professional Care",
+      "goal_1_title": "Sustainable Nervous System Development",
+      "goal_1_text": "Our goal is to protect children from overload. We achieve it through an environment with controlled stimulation, natural materials, and soft tones. We avoid strong artificial stimuli to support the child's ability to explore the world peacefully.",
+      "goal_2_title": "Building Inner Confidence",
+      "goal_2_text": "We aim for every child to build lasting trust in themselves and the world around them. This is achieved through small groups, permanent staff, and a smooth, individual adaptation that excludes separation stress.",
+      "goal_3_title": "Individual Biological Approach",
+      "goal_3_text": "At SIBEBE we aim for full synchronization of care with the baby's physiology. We do not impose artificial schedules; our goal is to follow each child's individual rhythm of sleep, feeding, and activity.",
+      "goal_4_title": "Partnership Based on Transparency",
+      "goal_4_text": "We strive for complete clarity in communication with parents. Our goal is to provide detailed feedback on each stage of the child's development, becoming a stable support for the family.",
+      "goal_5_title": "High Hygiene Standards",
+      "goal_5_text": "We maintain a microclimate that minimizes health risks. This includes impeccable disinfection, air purification, and use of materials that ensure a clean and healthy environment.",
+      "team_title": "Our Team",
+      "team_subtitle": "Expert Care with the Future in Mind",
+      "team_text": "We believe that early childhood development requires more than just attention – it requires a scientific approach, an experienced hand, and a warm heart. That is why behind the concept of our center stands a team of proven specialists who unite their efforts in the name of the most precious thing: the physical and emotional health of your child.",
+      "team_1_title": "Early Childhood Development Specialists and Educators",
+      "team_1_text": "Specialists who turn every experience into an opportunity for the child to discover the world and their own talents.",
+      "team_2_title": "Medical Staff",
+      "team_2_text": "Safety, physical health, and well-being are the foundation upon which we build everything else.",
+      "team_3_title": "Therapeutic Panel",
+      "team_3_text": "Our program is enhanced by the work of a speech therapist and an occupational therapist who monitor correct language and motor development.",
+      "reviews_title": "Parent Reviews"
+    },
+    "baby_center": {
+      "title": "SI BEBE – Early Care and Development Center (0–36 months)",
+      "subtitle": "We think about the emotions, development, and peace of every child.",
+      "intro": "We are a highly specialized baby center for hourly care of babies and children from 0 to 36 months.",
+      "pillar_1_title": "Biological Rhythm, Not Schedule",
+      "pillar_1_text": "We adapt the day to each child's individual needs for sleep, food, and closeness.",
+      "pillar_2_title": "Emotional Intelligence",
+      "pillar_2_text": "We treat the baby as an individual with a right to a voice and their own pace.",
+      "service_1": "Childcare",
+      "service_2": "Subscription Programs",
+      "service_3": "Thematic Workshops"
+    },
+    "partners": {
+      "hero_title": "Together we offer the best.",
+      "title": "Partners",
+      "form_title": "Become our partner",
+      "medical": "Medical",
+      "educational": "Educational",
+      "brand": "Brand",
+      "media": "Media",
+      "corporate": "Corporate"
+    },
+    "shop": {
+      "hero_title": "Under construction",
+      "hero_text": "Soon you will find selected toys and learning aids for your baby here."
+    }
+  }
+}
