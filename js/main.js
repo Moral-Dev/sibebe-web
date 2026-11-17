@@ -29,7 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const navItems = [
         { href: pagePath('home'), key: 'nav.home', label: 'Начало', activePages: ['home'] },
         { href: pagePath('about'), key: 'nav.about', label: 'За нас', activePages: ['about'] },
-        { href: pagePath('baby-center'), key: 'nav.baby_center', label: 'Бебешки център', activePages: ['baby-center'] },
+        {
+            href: pagePath('baby-center'),
+            key: 'nav.baby_center',
+            label: 'Бебешки център',
+            activePages: ['baby-center'],
+            children: [
+                { hash: 'expertise', key: 'baby_center.nav_expertise', label: 'Експертност и спокойствие' },
+                { hash: 'pillars', key: 'baby_center.nav_pillars', label: 'Четирите стълба' },
+                { hash: 'development', key: 'baby_center.nav_development', label: 'Какво правим' },
+                { hash: 'activities', key: 'baby_center.nav_activities', label: 'Дейност' },
+                { hash: 'services', key: 'baby_center.nav_services', label: 'Услуги' },
+                { hash: 'age-groups', key: 'baby_center.nav_age_groups', label: 'Възрастови групи' },
+                { hash: 'adaptation', key: 'baby_center.nav_adaptation', label: 'Адаптация' },
+                { hash: 'environment', key: 'baby_center.nav_environment', label: 'Среда и хигиена' },
+                { hash: 'daily-routine', key: 'baby_center.nav_daily_routine', label: 'Дневен режим' },
+                { hash: 'pricing', key: 'baby_center.nav_pricing', label: 'График и ценоразпис' },
+            ],
+        },
         { href: pagePath('academy'), key: 'nav.academy', label: 'Академия за родители', activePages: ['academy'] },
         { href: pagePath('partners'), key: 'nav.partners', label: 'Партньори', activePages: ['partners'] },
         { href: pagePath('gallery'), key: 'nav.gallery', label: 'Галерия', activePages: ['gallery'] },
@@ -43,16 +60,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const footerMount = document.getElementById('site-footer');
 
             if (headerMount) {
-                const navHtml = navItems.map(item => `
-                        <li><a href="${item.href}"${(item.activePages || [item.href]).includes(currentPage) ? ' class="active"' : ''} data-key="${item.key}">${item.label}</a></li>
-                `).join('');
+                const navHtml = navItems.map((item) => {
+                    const activeClass = (item.activePages || [item.href]).includes(currentPage) ? ' class="active"' : '';
+                    const link = `<a href="${item.href}"${activeClass} data-key="${item.key}">${item.label}</a>`;
+
+                    if (!item.children) {
+                        return `
+                        <li>${link}</li>`;
+                    }
+
+                    const subId = `submenu-${item.key.replace(/\W+/g, '-')}`;
+                    const subLinks = item.children.map((child) => `
+                                <li><a href="${item.href}#${child.hash}" data-key="${child.key}">${child.label}</a></li>`).join('');
+
+                    return `
+                        <li class="has-submenu">
+                            <div class="submenu-head">
+                                ${link}
+                                <button type="button" class="submenu-toggle" aria-expanded="false" aria-controls="${subId}" aria-label="Покажи разделите">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+                                </button>
+                            </div>
+                            <ul class="submenu" id="${subId}">${subLinks}
+                            </ul>
+                        </li>`;
+                }).join('');
 
                 headerMount.outerHTML = `
         <div class="top-bar">
             <div class="container top-bar-container">
                 <div class="top-bar-left">
                     <a href="tel:0879919779"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0879 919 779</a>
-                    <a href="tel:0886646207"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 088 664 6207</a>
+                    <a href="tel:0882915978"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0882 915 978</a>
                 </div>
                 <div class="top-bar-right">
                     <a href="https://www.facebook.com/profile.php?id=61555541437681" target="_blank" aria-label="Facebook">
@@ -72,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <nav>
                     <div class="logo">
                         <a href="${pagePath('home')}">
-                            <img src="${assetPath('assets/icons/logo-purple.png')}" alt="SI BEBE">
+                            <img src="${assetPath('assets/icons/logo-purple.webp')}" alt="SI BEBE">
                         </a>
                     </div>
                     <ul class="nav-links">
@@ -104,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="footer-bottom">
                     <div class="footer-phones">
                         <a href="tel:0879919779"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0879 919 779</a>
-                        <a href="tel:0886646207"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 088 664 6207</a>
+                        <a href="tel:0882915978"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0882 915 978</a>
                     </div>
                     <p class="footer-copyright">&copy; 2026 SI BEBE. All rights reserved.</p>
                     <div class="footer-social">
@@ -131,7 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-page-link]').forEach((link) => {
         const page = link.getAttribute('data-page-link');
-        if (page) link.setAttribute('href', pagePath(page));
+        const hash = link.getAttribute('data-page-hash');
+        if (page) link.setAttribute('href', pagePath(page) + (hash ? `#${hash}` : ''));
     });
 
     const topBar = document.querySelector('.top-bar');
@@ -166,9 +206,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target.closest('a')) {
                 header.classList.remove('nav-open');
                 menuToggle.setAttribute('aria-expanded', 'false');
+                closeSubmenus();
             }
         });
     }
+
+    function closeSubmenus(except) {
+        document.querySelectorAll('.has-submenu.open').forEach((item) => {
+            if (item === except) return;
+            item.classList.remove('open');
+            item.querySelector('.submenu-toggle')?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.querySelectorAll('.submenu-toggle').forEach((toggle) => {
+        toggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const item = toggle.closest('.has-submenu');
+            const isOpen = item.classList.toggle('open');
+            toggle.setAttribute('aria-expanded', String(isOpen));
+            closeSubmenus(item);
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.has-submenu')) closeSubmenus();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeSubmenus();
+    });
 
     const langSwitch = document.getElementById('lang-switch');
     if (!langSwitch) {
@@ -237,6 +304,39 @@ function initHeroCloudDividers() {
         nextSection.insertAdjacentHTML('afterbegin', HERO_CLOUD_DIVIDER_HTML);
     });
 }
+
+const PLACEHOLDER_ICONS = {
+    event: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path>',
+    photo: '<rect x="3" y="5" width="18" height="15" rx="2"></rect><circle cx="9" cy="11" r="2"></circle><path d="M21 17l-5-5-8 8"></path>',
+};
+
+const PLACEHOLDER_LABELS = {
+    event: 'Събитие в SI BEBE',
+    photo: 'Снимката не е налична',
+};
+
+function placeholderHtml(type) {
+    return `<div class="img-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PLACEHOLDER_ICONS[type]}</svg><span>${PLACEHOLDER_LABELS[type]}</span></div>`;
+}
+
+document.addEventListener('error', (event) => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    const box = img.closest('.event-image, .gallery-item');
+    if (!box || box.classList.contains('is-missing')) return;
+    box.classList.add('is-missing');
+    box.insertAdjacentHTML('beforeend', placeholderHtml(box.classList.contains('gallery-item') ? 'photo' : 'event'));
+}, true);
+
+document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('.more-toggle');
+    if (!toggle) return;
+    const target = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!target) return;
+    const isOpen = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    target.hidden = !isOpen;
+});
 
 const GOOGLE_SHEET_ID = '1GVZ5HZ4Io8CmyMF4sn4aUIWtQhOvFv81_5r7FTxKYcU';
 
@@ -325,7 +425,8 @@ const parseStars = (value) => {
     return Math.min(Math.max(stars, 1), 5);
 };
 
-const renderStars = (count) => '⭐'.repeat(count);
+const STAR_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5L2.5 9.3l6.6-.8z"></path></svg>';
+const renderStars = (count) => STAR_SVG.repeat(count);
 
 const getGoogleDriveId = (url, type) => {
     const value = String(url || '').trim();
@@ -359,6 +460,13 @@ const isLikelyImageUrl = (url) => {
     const value = String(url || '').trim();
     return /\.(avif|gif|jpe?g|png|svg|webp)(\?.*)?$/i.test(value);
 };
+
+const isGoogleDriveFileUrl = (url) => {
+    const value = String(url || '').trim();
+    return /drive\.google\.com/.test(value) && !isGoogleDriveFolderUrl(value) && Boolean(getGoogleDriveId(value, 'file'));
+};
+
+const isSupportedImageUrl = (url) => isLikelyImageUrl(url) || isGoogleDriveFileUrl(url);
 
 const parseEventDate = (value) => {
     const rawValue = String(value || '').trim();
@@ -532,6 +640,138 @@ async function fetchReviews() {
 }
 
 // Google Sheets Integration for Gallery
+const GALLERY_CATEGORY_PATTERNS = {
+    workshops: /работилни|workshop/,
+    activities: /занимани|activit/,
+    events: /събити|event/,
+    interior: /интериор|interior/,
+};
+
+const getGalleryCategory = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return '';
+
+    const match = Object.entries(GALLERY_CATEGORY_PATTERNS).find(([, pattern]) => pattern.test(normalized));
+    return match ? match[0] : '';
+};
+
+const renderGalleryItems = (container, items, filter) => {
+    const visibleItems = filter === 'all' ? items : items.filter((item) => item.category === filter);
+
+    if (!visibleItems.length) {
+        setGridMessage(container, 'Все още няма снимки в тази категория.');
+        return;
+    }
+
+    container.galleryItems = visibleItems;
+    container.innerHTML = visibleItems.map((item, index) => {
+        const imgUrl = getGalleryImageUrl(item.url);
+        return `
+                <figure class="gallery-item">
+                    <button type="button" class="gallery-open" data-index="${index}" aria-label="Уголеми снимка ${index + 1} от ${visibleItems.length}">
+                        <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.altText)}" loading="lazy">
+                    </button>
+                </figure>
+            `;
+    }).join('');
+};
+
+const initGalleryLightbox = (container) => {
+    const lightbox = document.createElement('div');
+    lightbox.className = 'lightbox';
+    lightbox.hidden = true;
+    lightbox.setAttribute('role', 'dialog');
+    lightbox.setAttribute('aria-modal', 'true');
+    lightbox.setAttribute('aria-label', 'Снимка от галерията');
+    lightbox.innerHTML = `
+        <button type="button" class="lightbox-btn lightbox-close" aria-label="Затвори"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        <button type="button" class="lightbox-btn lightbox-prev" aria-label="Предишна снимка"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+        <figure class="lightbox-figure">
+            <img class="lightbox-image" src="" alt="">
+            <figcaption class="lightbox-count" aria-live="polite"></figcaption>
+        </figure>
+        <button type="button" class="lightbox-btn lightbox-next" aria-label="Следваща снимка"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+    `;
+    document.body.appendChild(lightbox);
+
+    const image = lightbox.querySelector('.lightbox-image');
+    const count = lightbox.querySelector('.lightbox-count');
+    const closeButton = lightbox.querySelector('.lightbox-close');
+    let currentIndex = 0;
+    let opener = null;
+    let touchStartX = null;
+
+    const getItems = () => container.galleryItems || [];
+
+    const show = (index) => {
+        const items = getItems();
+        if (!items.length) return;
+        currentIndex = (index + items.length) % items.length;
+        const item = items[currentIndex];
+        image.src = getGalleryImageUrl(item.url);
+        image.alt = item.altText;
+        count.textContent = `${currentIndex + 1} / ${items.length}`;
+        lightbox.classList.toggle('is-single', items.length === 1);
+    };
+
+    const open = (index, trigger) => {
+        opener = trigger;
+        show(index);
+        lightbox.hidden = false;
+        document.body.classList.add('lightbox-open');
+        closeButton.focus();
+    };
+
+    const close = () => {
+        lightbox.hidden = true;
+        document.body.classList.remove('lightbox-open');
+        if (opener && document.body.contains(opener)) opener.focus();
+    };
+
+    container.addEventListener('click', (event) => {
+        const trigger = event.target.closest('.gallery-open');
+        if (!trigger) return;
+        open(Number(trigger.dataset.index) || 0, trigger);
+    });
+
+    lightbox.querySelector('.lightbox-prev').addEventListener('click', () => show(currentIndex - 1));
+    lightbox.querySelector('.lightbox-next').addEventListener('click', () => show(currentIndex + 1));
+    closeButton.addEventListener('click', close);
+    lightbox.addEventListener('click', (event) => {
+        if (event.target === lightbox) close();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (lightbox.hidden) return;
+        if (event.key === 'Escape') close();
+        if (event.key === 'ArrowLeft') show(currentIndex - 1);
+        if (event.key === 'ArrowRight') show(currentIndex + 1);
+        if (event.key === 'Tab') {
+            const focusable = Array.from(lightbox.querySelectorAll('button')).filter((button) => button.offsetParent !== null);
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+    });
+
+    lightbox.addEventListener('touchstart', (event) => {
+        touchStartX = event.touches[0].clientX;
+    }, { passive: true });
+
+    lightbox.addEventListener('touchend', (event) => {
+        if (touchStartX === null) return;
+        const deltaX = event.changedTouches[0].clientX - touchStartX;
+        if (Math.abs(deltaX) > 40) show(currentIndex + (deltaX < 0 ? 1 : -1));
+        touchStartX = null;
+    });
+};
+
 async function fetchGallery() {
     const galleryContainer = document.getElementById('gallery-container');
     if (!galleryContainer) return;
@@ -541,11 +781,13 @@ async function fetchGallery() {
 
         const galleryItems = rows.map((row) => {
             const url = getRowValue(row, ['URL', 'Image URL', 'Снимка', 'Линк'], 0);
-            const altText = getRowValue(row, ['Описание', 'Alt текст', 'Alt', 'Title'], 1) || 'SI BEBE Gallery';
+            const altText = getRowValue(row, ['Описание', 'Alt текст', 'Alt', 'Title'], -1) || 'SI BEBE Gallery';
+            const category = getRowValue(row, ['Категория', 'Category'], -1);
 
             return {
                 url: String(url).trim(),
                 altText: String(altText).trim(),
+                category: getGalleryCategory(category),
             };
         }).filter((item) => item.url && !isGoogleDriveFolderUrl(item.url));
 
@@ -554,14 +796,20 @@ async function fetchGallery() {
             return;
         }
 
-        galleryContainer.innerHTML = galleryItems.map((item) => {
-            const imgUrl = getGalleryImageUrl(item.url);
-            return `
-                <figure class="gallery-item">
-                    <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.altText)}" loading="lazy">
-                </figure>
-            `;
-        }).join('');
+        renderGalleryItems(galleryContainer, galleryItems, 'all');
+        initGalleryLightbox(galleryContainer);
+
+        const filterButtons = document.querySelectorAll('[data-gallery-filter]');
+        filterButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                filterButtons.forEach((other) => {
+                    const isActive = other === button;
+                    other.classList.toggle('is-active', isActive);
+                    other.setAttribute('aria-pressed', String(isActive));
+                });
+                renderGalleryItems(galleryContainer, galleryItems, button.getAttribute('data-gallery-filter'));
+            });
+        });
     } catch (e) {
         console.error("Error fetching gallery:", e);
         setGridMessage(galleryContainer, 'Снимките не могат да бъдат заредени в момента.');
@@ -602,15 +850,18 @@ async function fetchEvents() {
             const eventDate = parseEventDate(date);
             const resolvedStatus = status || (eventDate && eventDate < new Date() ? 'past' : 'upcoming');
             const displayDate = formatEventDate(eventDate, String(date));
-            const image = isLikelyImageUrl(url) ? getGalleryImageUrl(url) : assetPath('images/missions.png');
-            const eventLinkHtml = url && !isLikelyImageUrl(url)
+            const isImageUrl = isSupportedImageUrl(url);
+            const image = isImageUrl ? getGalleryImageUrl(url) : '';
+            const eventLinkHtml = url && !isImageUrl
                 ? `<a href="${escapeHtml(url)}" class="event-link" target="_blank" rel="noopener">Виж повече</a>`
                 : '';
 
             const eventHtml = `
                 <div class="card event-card">
-                    <div class="event-image" style="height: 200px; margin-bottom: 20px; border-radius: 10px; overflow: hidden;">
-                        <img src="${escapeHtml(image)}" alt="${escapeHtml(title)}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="event-image${image ? '' : ' is-missing'}" style="height: 200px; margin-bottom: 20px; border-radius: 10px; overflow: hidden;">
+                        ${image
+                            ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(title)}" style="width: 100%; height: 100%; object-fit: cover;">`
+                            : placeholderHtml('event')}
                     </div>
                     <div class="event-content">
                         <span class="event-date" style="color: var(--secondary-color); font-weight: 700; font-size: 0.9rem;">${escapeHtml(displayDate)}</span>
@@ -647,12 +898,26 @@ async function fetchEvents() {
     }
 }
 
-const GOOGLE_APPS_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyg901y3rs68sHDEWoS_1Cv38vc9xNVcy9tR4ofJMg8_HcuV2J5F8E278rL--lQ7uFK/exec';
 
-async function submitGoogleSheetForm(form, sheetName, successMessage) {
+const getFormValue = (form, name) => String(new FormData(form).get(name) || '').trim();
+
+const getPartnerSheetFields = (form) => {
+    const firstName = getFormValue(form, 'first_name');
+    const lastName = getFormValue(form, 'last_name');
+
+    return {
+        full_name: [firstName, lastName].filter(Boolean).join(' '),
+    };
+};
+
+async function submitGoogleSheetForm(form, sheetName, successMessage, extraFields = {}) {
     const formData = new FormData(form);
     formData.append('sheet', sheetName);
     formData.append('submitted_at', new Date().toISOString());
+    Object.entries(extraFields).forEach(([key, value]) => {
+        formData.append(key, value);
+    });
 
     if (!GOOGLE_APPS_SCRIPT_URL || GOOGLE_APPS_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
         console.log(`${sheetName} form data to send:`, Object.fromEntries(formData.entries()));
@@ -692,7 +957,12 @@ function initPartnerForm() {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                await submitGoogleSheetForm(form, 'Partners', 'Благодарим Ви! Ще се свържем с Вас скоро.');
+                await submitGoogleSheetForm(
+                    form,
+                    'Partners',
+                    'Благодарим Ви! Ще се свържем с Вас скоро.',
+                    getPartnerSheetFields(form)
+                );
             } catch (error) {
                 console.error('Error submitting partner form:', error);
                 alert('Възникна грешка. Моля, опитайте отново.');

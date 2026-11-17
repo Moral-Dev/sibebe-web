@@ -79,7 +79,8 @@
 *   **Events** (Събития):
     *   Колона A: Заглавие
     *   Колона B: Описание
-    *   Колона C: URL към събитието (по желание)
+    *   Колона C: URL към събитието или URL към снимка (по желание)
+    *   Ако URL-ът е снимка, тя се показва в картата на събитието. Поддържат се директни image URL-и и Google Drive file линкове към отделни снимки.
     *   Колона D: Дата
     *   *Забележка: В таблицата този лист трябва да се казва **Events**.*
 
@@ -108,9 +109,64 @@
 
 1.  В същата Google таблица създайте листове с имена **Bookings** и **Partners**.
 2.  Отидете на **Extensions > Apps Script**.
-3.  Изтрийте кода и поставете скрипт за приемане на POST заявки (можете да използвате стандартен `doPost(e)` скрипт).
+3.  Изтрийте кода и поставете този скрипт:
+
+```js
+const SPREADSHEET_ID = '1TtNjAwh_5OMMrlqMoO_uElfDYultvdpB1bxrqso81lU';
+
+function doGet() {
+  return createResponse({ ok: true, message: 'SI BEBE Apps Script is active.' });
+}
+
+function doPost(e) {
+  const params = e.parameter || {};
+  const sheetName = params.sheet;
+
+  if (!sheetName) {
+    return createResponse({ ok: false, error: 'Missing sheet name.' });
+  }
+
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
+
+  if (!sheet) {
+    return createResponse({ ok: false, error: `Sheet "${sheetName}" was not found.` });
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const aliases = {
+    'Име и фамилия': ['Име и фамилия', 'full_name', 'name'],
+    Email: ['Email', 'email'],
+    'Компания': ['Компания', 'company'],
+    'Телефон': ['Телефон', 'phone'],
+    'Дата': ['Дата', 'submitted_at'],
+    'Записки': ['Записки'],
+  };
+
+  const row = headers.map((header) => {
+    const key = String(header || '').trim();
+    const keys = aliases[key] || [key];
+    const value = keys.map((alias) => params[alias]).find((item) => item);
+
+    if (key === 'Дата' && params.submitted_at) {
+      return new Date(params.submitted_at);
+    }
+
+    return value || '';
+  });
+
+  sheet.appendRow(row);
+  return createResponse({ ok: true });
+}
+
+function createResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
 4.  Кликнете **Deploy > New Deployment**.
 5.  Изберете тип **Web App**.
 6.  Set **Execute as: Me** и **Who has access: Anyone**.
 7.  Копирайте генерирания **Web App URL**.
-8.  Поставете го в `js/main.js` на ред 331 на мястото на `YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL`.
+8.  Поставете го в `js/main.js` на мястото на `YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL`.
