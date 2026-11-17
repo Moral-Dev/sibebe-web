@@ -2999,3 +2999,15 @@ body.lightbox-open {
     opacity: 0.6;
     cursor: wait;
 }
+
+/* Form cards stay put and above the next section, so open dropdowns are never covered */
+.booking-card,
+.partner-form-card {
+    position: relative;
+    z-index: 5;
+}
+
+.booking-card:hover,
+.partner-form-card:hover {
+    transform: none;
+}
