@@ -921,7 +921,7 @@ async function submitGoogleSheetForm(form, sheetName, successMessage, extraField
 
     if (!GOOGLE_APPS_SCRIPT_URL || GOOGLE_APPS_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
         console.log(`${sheetName} form data to send:`, Object.fromEntries(formData.entries()));
-        alert('Формата е готова, но Google Apps Script URL още не е настроен.');
+        showFormStatus(form, 'error', 'Формата е готова, но Google Apps Script URL още не е настроен.');
         return;
     }
 
@@ -931,9 +931,239 @@ async function submitGoogleSheetForm(form, sheetName, successMessage, extraField
         body: formData,
     });
 
-    alert(successMessage);
     form.reset();
+    showFormStatus(form, 'success', successMessage);
 }
+
+// ---------- Form messages shown on the page instead of browser pop-ups ----------
+const FIELD_MESSAGES = {
+    required: 'Моля, попълнете това поле.',
+    select: 'Моля, изберете от списъка.',
+    email: 'Моля, въведете валиден имейл адрес.',
+};
+
+const getFieldMessage = (field) => {
+    if (field.validity.valueMissing) {
+        return field.tagName === 'SELECT' ? FIELD_MESSAGES.select : FIELD_MESSAGES.required;
+    }
+    if (field.validity.typeMismatch) return FIELD_MESSAGES.email;
+    return '';
+};
+
+function validateFieldGroup(container) {
+    const fields = Array.from(container.querySelectorAll('input, select, textarea'));
+    let message = '';
+
+    fields.forEach((field) => {
+        const fieldMessage = getFieldMessage(field);
+        const isInvalid = Boolean(fieldMessage);
+        field.classList.toggle('is-invalid', isInvalid);
+        field.setAttribute('aria-invalid', String(isInvalid));
+        field.closest('.cselect')?.classList.toggle('is-invalid', isInvalid);
+        if (isInvalid && !message) message = fieldMessage;
+    });
+
+    let errorEl = container.querySelector(':scope > .field-error');
+    if (message) {
+        if (!errorEl) {
+            errorEl = document.createElement('p');
+            errorEl.className = 'field-error';
+            errorEl.id = `field-error-${Math.random().toString(36).slice(2, 9)}`;
+            container.appendChild(errorEl);
+        }
+        errorEl.textContent = message;
+        fields.forEach((field) => field.setAttribute('aria-describedby', errorEl.id));
+    } else if (errorEl) {
+        errorEl.remove();
+        fields.forEach((field) => field.removeAttribute('aria-describedby'));
+    }
+
+    container.classList.toggle('has-error', Boolean(message));
+    return !message;
+}
+
+function validateForm(form) {
+    const containers = Array.from(form.querySelectorAll('.form-field'));
+    const invalid = containers.filter((container) => !validateFieldGroup(container));
+    if (!invalid.length) return true;
+
+    const firstField = invalid[0].querySelector('.is-invalid');
+    const focusTarget = firstField?.closest('.cselect')?.querySelector('.cselect-button') || firstField;
+    focusTarget?.focus();
+    return false;
+}
+
+function initLiveValidation(form) {
+    form.addEventListener('input', (event) => {
+        const container = event.target.closest('.form-field');
+        if (container?.classList.contains('has-error')) validateFieldGroup(container);
+        form.querySelector('.form-status')?.setAttribute('hidden', '');
+    });
+    form.addEventListener('change', (event) => {
+        const container = event.target.closest('.form-field');
+        if (container?.classList.contains('has-error')) validateFieldGroup(container);
+    });
+}
+
+function showFormStatus(form, state, message) {
+    let status = form.querySelector('.form-status');
+    if (!status) {
+        status = document.createElement('p');
+        status.className = 'form-status';
+        status.setAttribute('role', 'status');
+        status.setAttribute('aria-live', 'polite');
+        form.appendChild(status);
+    }
+    status.dataset.state = state;
+    status.textContent = message;
+    status.hidden = false;
+}
+
+function setFormBusy(form, isBusy) {
+    const button = form.querySelector('[type="submit"]');
+    if (button) button.disabled = isBusy;
+    form.setAttribute('aria-busy', String(isBusy));
+}
+
+// ---------- Dropdowns styled like the site instead of the system list ----------
+let openSelectClose = null;
+
+function enhanceSelect(select) {
+    if (select.dataset.enhanced) return;
+    select.dataset.enhanced = 'true';
+
+    const baseId = select.id || `select-${Math.random().toString(36).slice(2, 9)}`;
+    const wrapper = document.createElement('div');
+    wrapper.className = `cselect${select.classList.contains('lang-switch') ? ' cselect--compact' : ''}`;
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.appendChild(select);
+    select.classList.add('cselect-native');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'cselect-button';
+    button.id = `${baseId}-button`;
+    button.setAttribute('aria-haspopup', 'listbox');
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-controls', `${baseId}-list`);
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'cselect-value';
+    valueEl.id = `${baseId}-value`;
+    button.appendChild(valueEl);
+    button.insertAdjacentHTML('beforeend', '<svg class="cselect-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>');
+
+    const label = select.id ? document.querySelector(`label[for="${select.id}"]`) : null;
+    if (label) {
+        label.id = label.id || `${baseId}-label`;
+        label.htmlFor = button.id;
+        button.setAttribute('aria-labelledby', `${label.id} ${valueEl.id}`);
+    } else if (select.getAttribute('aria-label')) {
+        button.setAttribute('aria-label', select.getAttribute('aria-label'));
+    } else if (select.classList.contains('lang-switch')) {
+        button.setAttribute('aria-label', 'Език');
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'cselect-list';
+    list.id = `${baseId}-list`;
+    list.setAttribute('role', 'listbox');
+    list.tabIndex = -1;
+    list.hidden = true;
+    if (label) list.setAttribute('aria-labelledby', label.id);
+
+    const options = Array.from(select.options).filter((option) => option.value !== '');
+    const items = options.map((option, index) => {
+        const item = document.createElement('li');
+        item.id = `${baseId}-option-${index}`;
+        item.setAttribute('role', 'option');
+        item.dataset.value = option.value;
+        item.textContent = option.textContent;
+        list.appendChild(item);
+        return item;
+    });
+
+    wrapper.appendChild(button);
+    wrapper.appendChild(list);
+
+    let activeIndex = -1;
+
+    const render = () => {
+        const selected = select.selectedOptions[0];
+        valueEl.textContent = selected ? selected.textContent : '';
+        wrapper.classList.toggle('is-placeholder', !select.value);
+        items.forEach((item) => item.setAttribute('aria-selected', String(item.dataset.value === select.value)));
+    };
+
+    const setActive = (index) => {
+        activeIndex = Math.max(0, Math.min(items.length - 1, index));
+        items.forEach((item, i) => item.classList.toggle('is-active', i === activeIndex));
+        list.setAttribute('aria-activedescendant', items[activeIndex].id);
+        items[activeIndex].scrollIntoView({ block: 'nearest' });
+    };
+
+    const close = (returnFocus) => {
+        if (list.hidden) return;
+        list.hidden = true;
+        wrapper.classList.remove('is-open');
+        button.setAttribute('aria-expanded', 'false');
+        if (openSelectClose === close) openSelectClose = null;
+        if (returnFocus) button.focus();
+    };
+
+    const open = () => {
+        if (openSelectClose && openSelectClose !== close) openSelectClose(false);
+        list.hidden = false;
+        wrapper.classList.add('is-open');
+        button.setAttribute('aria-expanded', 'true');
+        openSelectClose = close;
+        const selectedIndex = items.findIndex((item) => item.dataset.value === select.value);
+        setActive(selectedIndex >= 0 ? selectedIndex : 0);
+        list.focus();
+    };
+
+    const choose = (index) => {
+        select.value = items[index].dataset.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        render();
+        close(true);
+    };
+
+    button.addEventListener('click', () => (list.hidden ? open() : close(true)));
+    button.addEventListener('keydown', (event) => {
+        if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+            event.preventDefault();
+            open();
+        }
+    });
+
+    list.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') { event.preventDefault(); setActive(activeIndex + 1); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(activeIndex - 1); }
+        else if (event.key === 'Home') { event.preventDefault(); setActive(0); }
+        else if (event.key === 'End') { event.preventDefault(); setActive(items.length - 1); }
+        else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(activeIndex); }
+        else if (event.key === 'Escape') { event.preventDefault(); close(true); }
+        else if (event.key === 'Tab') { close(false); }
+    });
+
+    items.forEach((item, index) => {
+        item.addEventListener('click', () => choose(index));
+        item.addEventListener('mousemove', () => {
+            if (activeIndex !== index) setActive(index);
+        });
+    });
+
+    select.addEventListener('change', render);
+    select.form?.addEventListener('reset', () => setTimeout(render));
+    render();
+}
+
+document.addEventListener('click', (event) => {
+    if (openSelectClose && !event.target.closest('.cselect')) openSelectClose(false);
+});
 
 // Simple Booking Form Integration
 function initBookingForm() {
@@ -941,14 +1171,23 @@ function initBookingForm() {
     if (form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!validateForm(form)) return;
+            setFormBusy(form, true);
             try {
                 await submitGoogleSheetForm(form, 'Bookings', 'Благодарим Ви! Ще се свържем с Вас скоро.');
             } catch (error) {
                 console.error('Error submitting booking form:', error);
-                alert('Възникна грешка. Моля, опитайте отново.');
+                showFormStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+            } finally {
+                setFormBusy(form, false);
             }
         });
     }
+}
+
+function initForms() {
+    document.querySelectorAll('select').forEach(enhanceSelect);
+    document.querySelectorAll('.site-form').forEach(initLiveValidation);
 }
 
 function initPartnerForm() {
@@ -956,6 +1195,8 @@ function initPartnerForm() {
     if (form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!validateForm(form)) return;
+            setFormBusy(form, true);
             try {
                 await submitGoogleSheetForm(
                     form,
@@ -965,7 +1206,9 @@ function initPartnerForm() {
                 );
             } catch (error) {
                 console.error('Error submitting partner form:', error);
-                alert('Възникна грешка. Моля, опитайте отново.');
+                showFormStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+            } finally {
+                setFormBusy(form, false);
             }
         });
     }
@@ -1015,6 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchReviews();
     fetchGallery();
     fetchEvents();
+    initForms();
     initBookingForm();
     initPartnerForm();
     initCopyContacts();

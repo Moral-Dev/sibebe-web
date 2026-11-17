@@ -2841,3 +2841,161 @@ body.lightbox-open {
         font-size: 20px;
     }
 }
+
+/* ===== Site-styled dropdowns and form messages ===== */
+.cselect {
+    position: relative;
+}
+
+.cselect-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.cselect-button {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: var(--white);
+    color: var(--heading-color);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cselect.is-placeholder .cselect-value {
+    color: var(--text-color);
+    opacity: 0.75;
+}
+
+.cselect.is-placeholder .cselect-value:empty::before {
+    content: '--- Избери ---';
+}
+
+.cselect-chevron {
+    flex: none;
+    color: var(--primary-color);
+    transition: transform 0.2s ease;
+}
+
+.cselect.is-open .cselect-chevron {
+    transform: rotate(180deg);
+}
+
+.cselect-button:focus-visible,
+.cselect.is-open .cselect-button {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(43, 22, 74, 0.18);
+}
+
+.cselect-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 14px 30px rgba(43, 22, 74, 0.18);
+    max-height: 260px;
+    overflow-y: auto;
+    outline: none;
+}
+
+.cselect-list li {
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--heading-color);
+    cursor: pointer;
+}
+
+.cselect-list li.is-active {
+    background: var(--bg-color);
+    color: var(--primary-color);
+}
+
+.cselect-list li[aria-selected="true"] {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.cselect-list li[aria-selected="true"]::after {
+    content: '✓';
+    float: right;
+}
+
+/* Compact variant for the language switch in the menu */
+.cselect--compact .cselect-button {
+    min-height: 0;
+    padding: 4px 8px;
+    gap: 6px;
+    border: 1px solid #e7e7e7;
+    border-radius: 4px;
+    background: transparent;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.cselect--compact .cselect-chevron {
+    width: 12px;
+    height: 12px;
+}
+
+.cselect--compact .cselect-list {
+    right: auto;
+    min-width: 110px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Field errors */
+.site-form .is-invalid,
+.cselect.is-invalid .cselect-button {
+    border-color: #d92828;
+}
+
+.field-error {
+    margin: 0;
+    color: #b42318;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Result message after sending */
+.form-status {
+    margin: 4px 0 0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.form-status[data-state="success"] {
+    background: #E7F5EC;
+    color: #1E6B3A;
+}
+
+.form-status[data-state="error"] {
+    background: #FDECEA;
+    color: #B42318;
+}
+
+.site-form [type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
