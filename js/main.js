@@ -344,6 +344,7 @@ const SHEETS = {
     reviews: 'Reviews',
     gallery: 'Gallery',
     events: 'Events',
+    pricing: 'Pricing',
 };
 
 const escapeHtml = (value) => String(value ?? '')
@@ -816,6 +817,34 @@ async function fetchGallery() {
     }
 }
 
+// Price list image: the first link in the "Pricing" sheet, under a column named "Ценоразпис".
+// Google returns the first sheet when a sheet name does not exist, so the column name is checked
+// before the link is used. Until the sheet exists, the copy in images/ is shown.
+async function fetchPriceList() {
+    const figure = document.querySelector('.price-image');
+    if (!figure) return;
+
+    try {
+        const rows = await fetchGoogleSheetRows(SHEETS.pricing);
+        const isPricingSheet = rows.length && Object.prototype.hasOwnProperty.call(rows[0].byHeader, normalizeHeader('Ценоразпис'));
+        if (!isPricingSheet) return;
+
+        const url = rows
+            .map((row) => String(row.byHeader[normalizeHeader('Ценоразпис')] || '').trim())
+            .find((value) => value && isSupportedImageUrl(value));
+        if (!url) return;
+
+        const src = getGalleryImageUrl(url);
+        const fullSize = getGoogleDriveId(url, 'file')
+            ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(getGoogleDriveId(url, 'file'))}&sz=w2400`
+            : src;
+        figure.querySelector('img').src = src;
+        figure.querySelector('a').href = fullSize;
+    } catch (error) {
+        console.warn('Price list image could not be loaded from the sheet; showing the local copy.', error);
+    }
+}
+
 // Google Sheets Integration for Events
 async function fetchEvents() {
     const eventsSection = document.getElementById('events');
@@ -1258,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchReviews();
     fetchGallery();
     fetchEvents();
+    fetchPriceList();
     initForms();
     initBookingForm();
     initPartnerForm();

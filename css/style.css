@@ -3011,3 +3011,21 @@ body.lightbox-open {
 .partner-form-card:hover {
     transform: none;
 }
+
+/* Price list image */
+.price-image {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.price-image img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(43, 22, 74, 0.16);
+}
+
+#pricing .section-cta {
+    margin-top: 36px;
+}
