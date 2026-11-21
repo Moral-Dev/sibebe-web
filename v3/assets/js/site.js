@@ -1,7 +1,7 @@
-/* SI BEBE v2: menu, motion, Google Sheets content, gallery, forms. */
+/* SI BEBE v2: menu, motion, content from the site API, gallery, forms. */
 
-const SHEET_ID = '1GVZ5HZ4Io8CmyMF4sn4aUIWtQhOvFv81_5r7FTxKYcU';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyg901y3rs68sHDEWoS_1Cv38vc9xNVcy9tR4ofJMg8_HcuV2J5F8E278rL--lQ7uFK/exec';
+// Content and forms are served by the site's own PHP API (api/content.php, api/submit.php)
+const API = 'api/';
 
 const ICONS = {
     star: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5L2.5 9.3l6.6-.8z"/></svg>',
@@ -93,8 +93,11 @@ function observeReveal(root = document) {
             });
         }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
     }
+    const fold = window.innerHeight;
     const mark = (el, kind) => {
         if (el.hasAttribute('data-reveal') || el.closest('.hero, .page-intro')) return;
+        // Already on screen when the page opens: leave it visible (hiding it now would make it blink)
+        if (el.getBoundingClientRect().top < fold) return;
         el.setAttribute('data-reveal', kind);
         // Stagger siblings that enter together
         const siblings = Array.from(el.parentElement.children).filter((c) => c.hasAttribute('data-reveal'));
@@ -103,34 +106,6 @@ function observeReveal(root = document) {
     };
     REVEAL.forEach(([selector, kind]) => root.querySelectorAll(selector).forEach((el) => mark(el, kind)));
     root.querySelectorAll('.review, .event').forEach((el) => mark(el, ''));
-}
-
-function splitWords() {
-    document.querySelectorAll('[data-split]').forEach((heading) => {
-        let index = 0;
-        const walk = (node) => {
-            Array.from(node.childNodes).forEach((child) => {
-                if (child.nodeType === Node.TEXT_NODE) {
-                    const parts = child.textContent.split(/(\s+)/);
-                    const frag = document.createDocumentFragment();
-                    parts.forEach((part) => {
-                        if (!part) return;
-                        if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
-                        const span = document.createElement('span');
-                        span.className = 'w';
-                        span.style.setProperty('--wi', index++);
-                        span.textContent = part;
-                        frag.appendChild(span);
-                    });
-                    child.replaceWith(frag);
-                } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName.toLowerCase() !== 'svg') {
-                    walk(child);
-                }
-            });
-        };
-        walk(heading);
-        heading.classList.add('is-ready');
-    });
 }
 
 function addStars() {
@@ -214,49 +189,12 @@ document.addEventListener('click', (event) => {
     target.hidden = !open;
 });
 
-/* ---------- Google Sheets ---------- */
-const normalize = (value) => String(value ?? '').trim().toLowerCase();
-
-async function fetchSheet(name) {
-    const params = new URLSearchParams({ tqx: 'out:json', sheet: name, headers: '1' });
-    const response = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${params}`);
-    if (!response.ok) throw new Error(`Sheet request failed: ${response.status}`);
-    const text = await response.text();
-    if (text.trim().startsWith('<')) throw new Error('Sheet is not public.');
-    const json = JSON.parse(text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')));
-    const headers = (json.table.cols || []).map((col) => normalize(col.label || col.id));
-    return (json.table.rows || []).map((row) => {
-        const values = (row.c || []).map((cell) => (cell ? (cell.f ?? cell.v ?? '') : ''));
-        const byHeader = {};
-        headers.forEach((header, i) => { if (header) byHeader[header] = values[i] ?? ''; });
-        return { values, byHeader, headers };
-    });
+/* ---------- Content from the site's own database ---------- */
+async function fetchContent(type) {
+    const response = await fetch(`${API}content.php?type=${encodeURIComponent(type)}`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Content request failed: ${response.status}`);
+    return response.json();
 }
-
-const pick = (row, names, fallbackIndex) => {
-    for (const name of names) {
-        const value = row.byHeader[normalize(name)];
-        if (value !== undefined && value !== '') return value;
-    }
-    return fallbackIndex === undefined ? '' : (row.values[fallbackIndex] ?? '');
-};
-
-const driveId = (url) => {
-    const match = String(url).match(/\/file\/d\/([\w-]+)/) || String(url).match(/[?&]id=([\w-]+)/);
-    return match ? match[1] : '';
-};
-
-const isDriveFolder = (url) => /drive\.google\.com\/drive\/folders\//.test(String(url));
-
-const imageUrl = (url, size = 'w1200') => {
-    const value = String(url || '').trim();
-    if (/drive\.google\.com/.test(value) && !isDriveFolder(value) && driveId(value)) {
-        return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveId(value))}&sz=${size}`;
-    }
-    return value;
-};
-
-const isImageUrl = (url) => /\.(avif|gif|jpe?g|png|svg|webp)(\?.*)?$/i.test(String(url)) || (/drive\.google\.com/.test(String(url)) && !isDriveFolder(url) && Boolean(driveId(url)));
 
 const placeholder = (type) => `<div class="placeholder">${type === 'event' ? ICONS.calendar : ICONS.photo}<span>${type === 'event' ? 'Събитие в SI BEBE' : 'Снимката не е налична'}</span></div>`;
 
@@ -274,11 +212,10 @@ async function loadReviews() {
     const box = document.querySelector('[data-reviews]');
     if (!box) return;
     try {
-        const rows = await fetchSheet('Reviews');
-        const reviews = rows.map((row) => ({
-            author: String(pick(row, ['Име на автор', 'Автор', 'Author'], 0)).trim(),
-            text: String(pick(row, ['Отзив', 'Oтзив', 'Review'], 1)).trim(),
-            stars: Math.min(Math.max(parseInt(pick(row, ['Брой звезди', 'Звезди', 'Stars'], 2), 10) || 5, 1), 5),
+        const reviews = (await fetchContent('reviews')).map((review) => ({
+            author: String(review.author || '').trim(),
+            text: String(review.text || '').trim(),
+            stars: Math.min(Math.max(parseInt(review.stars, 10) || 5, 1), 5),
         })).filter((review) => review.author && review.text);
 
         box.innerHTML = reviews.length
@@ -297,16 +234,7 @@ async function loadReviews() {
 }
 
 /* Events */
-const parseDate = (value) => {
-    const raw = String(value || '').trim();
-    const g = raw.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
-    if (g) return new Date(+g[1], +g[2], +g[3], +(g[4] || 0), +(g[5] || 0));
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? null : d;
-};
-
-const formatDate = (date, fallback) => {
-    if (!date) return fallback;
+const formatDate = (date) => {
     const time = date.getHours() || date.getMinutes()
         ? ` ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
         : '';
@@ -317,33 +245,28 @@ async function loadEvents() {
     const section = document.querySelector('[data-events-section]');
     if (!section) return;
     try {
-        const rows = await fetchSheet('Events');
         const upcoming = [];
         const past = [];
-        rows.forEach((row) => {
-            const title = String(pick(row, ['Заглавие', 'Title'], 0)).trim();
-            const description = String(pick(row, ['Описание', 'Description'], 1)).trim();
-            const url = String(pick(row, ['URL', 'Линк'], 2)).trim();
-            const rawDate = pick(row, ['Дата', 'Date'], 3);
-            const status = normalize(pick(row, ['Статус', 'Status']));
-            if (!title || !rawDate) return;
-            const date = parseDate(rawDate);
-            const image = isImageUrl(url) ? imageUrl(url) : '';
-            const link = url && !image ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Виж повече</a>` : '';
+        (await fetchContent('events')).forEach((event) => {
+            const title = String(event.title || '').trim();
+            if (!title || !event.date) return;
+            const date = new Date(event.date);
+            const description = String(event.description || '').trim();
+            const image = event.image || '';
+            const link = event.link ? `<a href="${escapeHtml(event.link)}" target="_blank" rel="noopener">Виж повече</a>` : '';
             const html = `
                 <article class="event">
                     <div class="event-media${image ? '' : ' is-missing'}">
                         ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(title)}" loading="lazy">` : placeholder('event')}
                     </div>
                     <div class="event-body">
-                        <span class="event-date">${escapeHtml(formatDate(date, String(rawDate)))}</span>
+                        <span class="event-date">${escapeHtml(formatDate(date))}</span>
                         <h3>${escapeHtml(title)}</h3>
                         <p>${escapeHtml(description)}</p>
                         ${link}
                     </div>
                 </article>`;
-            const isPast = status ? status === 'past' : (date && date < new Date());
-            (isPast ? past : upcoming).push(html);
+            (event.past ? past : upcoming).push(html);
         });
 
         const fill = (key, items) => {
@@ -361,37 +284,7 @@ async function loadEvents() {
     }
 }
 
-/* Price list image: "Pricing" sheet, column "Ценоразпис".
-   Google returns the first sheet when a name does not exist, so the column is checked first. */
-async function loadPriceList() {
-    const figure = document.querySelector('[data-price-list]');
-    if (!figure) return;
-    try {
-        const rows = await fetchSheet('Pricing');
-        if (!rows.length || !rows[0].headers.includes(normalize('Ценоразпис'))) return;
-        const url = rows.map((row) => String(row.byHeader[normalize('Ценоразпис')] || '').trim()).find(isImageUrl);
-        if (!url) return;
-        figure.querySelector('img').src = imageUrl(url, 'w1400');
-        figure.querySelector('a').href = imageUrl(url, 'w2400');
-    } catch (error) {
-        console.warn('Price list from the sheet is not available; showing the local copy.', error);
-    }
-}
-
 /* ---------- Gallery with categories and lightbox ---------- */
-const CATEGORY_PATTERNS = {
-    workshops: /работилни|workshop/,
-    activities: /занимани|activit/,
-    events: /събити|event/,
-    interior: /интериор|interior/,
-};
-
-const categoryOf = (value) => {
-    const text = normalize(value);
-    const match = Object.entries(CATEGORY_PATTERNS).find(([, pattern]) => pattern.test(text));
-    return match ? match[0] : '';
-};
-
 async function loadGallery() {
     const grid = document.querySelector('[data-gallery]');
     if (!grid) return;
@@ -404,19 +297,18 @@ async function loadGallery() {
             ? visible.map((item, i) => `
                 <figure class="tile" style="--i:${Math.min(i, 12)}">
                     <button type="button" data-index="${i}" aria-label="Уголеми снимка ${i + 1} от ${visible.length}">
-                        <img src="${escapeHtml(imageUrl(item.url))}" alt="${escapeHtml(item.alt)}" loading="lazy">
+                        <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt)}" loading="lazy">
                     </button>
                 </figure>`).join('')
             : '<p class="loading-note">Все още няма снимки в тази категория.</p>';
     };
 
     try {
-        const rows = await fetchSheet('Gallery');
-        items = rows.map((row) => ({
-            url: String(pick(row, ['URL', 'Снимка', 'Линк'], 0)).trim(),
-            alt: String(pick(row, ['Описание', 'Alt']) || 'Снимка от SI BEBE').trim(),
-            category: categoryOf(pick(row, ['Категория', 'Category'])),
-        })).filter((item) => item.url && !isDriveFolder(item.url));
+        items = (await fetchContent('gallery')).map((item) => ({
+            url: String(item.url || '').trim(),
+            alt: String(item.alt || 'Снимка от SI BEBE').trim(),
+            category: item.category || '',
+        })).filter((item) => item.url);
         render('all');
     } catch (error) {
         console.error(error);
@@ -454,7 +346,7 @@ async function loadGallery() {
     const show = (index) => {
         if (!visible.length) return;
         current = (index + visible.length) % visible.length;
-        img.src = imageUrl(visible[current].url, 'w2000');
+        img.src = visible[current].url;
         img.alt = visible[current].alt;
         caption.textContent = `${current + 1} / ${visible.length}`;
         lightbox.classList.toggle('is-single', visible.length === 1);
@@ -687,20 +579,19 @@ function initForm(form) {
         submit.disabled = true;
         submit.classList.add('is-loading');
         const data = new FormData(form);
-        data.append('sheet', form.dataset.sheet);
-        data.append('submitted_at', new Date().toISOString());
-        if (form.dataset.sheet === 'Partners') {
-            data.append('full_name', [data.get('first_name'), data.get('last_name')].filter(Boolean).join(' '));
-        }
+        data.append('form', form.dataset.form);
 
         try {
-            await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: data });
+            const response = await fetch(`${API}submit.php`, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) throw new Error(result.error || `Submit failed: ${response.status}`);
             form.reset();
             form.querySelector('.form-status')?.setAttribute('hidden', '');
             showFormSuccess(form, 'Благодарим Ви! Ще се свържем с Вас скоро.');
         } catch (error) {
             console.error(error);
-            showStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+            const known = /[А-Яа-я]/.test(error.message) ? error.message : 'Възникна грешка. Моля, опитайте отново или ни се обадете.';
+            showStatus(form, 'error', known);
             shakeButton(submit);
         } finally {
             submit.disabled = false;
@@ -745,6 +636,176 @@ function shakeButton(button) {
     button.classList.add('is-error');
 }
 
+/* ---------- On-page photo editor (only for a logged-in admin) ---------- */
+async function initEditor() {
+    if (!document.cookie.split('; ').includes('sibebe_editor=1')) return;
+    let state;
+    try {
+        state = await (await fetch(`${API}edit.php`, { headers: { Accept: 'application/json' } })).json();
+    } catch (error) {
+        return;
+    }
+    if (!state || !state.editor) return;
+
+    const root = document.documentElement;
+    root.classList.add('is-editing');
+    const slotOf = (img) => {
+        const match = (img.getAttribute('src') || '').match(/(?:^|\/)media\/([\w-]+)\.(?:webp|jpg)/);
+        return match && state.slots[match[1]] ? match[1] : null;
+    };
+
+    const bar = document.createElement('div');
+    bar.className = 'edit-bar';
+    bar.innerHTML = `
+        <span class="edit-bar-dot" aria-hidden="true"></span>
+        <span class="edit-bar-text"><b>Режим на редакция</b><span> Посочете снимка и натиснете „Смени“.</span></span>
+        <button type="button" data-edit-toggle aria-pressed="false">Скрий бутоните</button>
+        <a href="admin/">Админ панел</a>`;
+    document.body.appendChild(bar);
+    bar.querySelector('[data-edit-toggle]').addEventListener('click', (event) => {
+        const hidden = root.classList.toggle('edit-hidden');
+        event.currentTarget.textContent = hidden ? 'Покажи бутоните' : 'Скрий бутоните';
+        event.currentTarget.setAttribute('aria-pressed', String(hidden));
+    });
+
+    const toast = document.createElement('div');
+    toast.className = 'edit-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+    let toastTimer = null;
+    const say = (message, isError = false) => {
+        toast.textContent = message;
+        toast.classList.toggle('is-error', isError);
+        toast.classList.add('is-on');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('is-on'), 3200);
+    };
+
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.accept = 'image/jpeg,image/png,image/webp';
+    picker.hidden = true;
+    document.body.appendChild(picker);
+    let pending = null;
+
+    document.querySelectorAll('img').forEach((img) => {
+        const slot = slotOf(img);
+        if (!slot) return;
+        const host = img.parentElement;
+        host.classList.add('edit-host');
+        const tools = document.createElement('div');
+        tools.className = 'edit-tools';
+        tools.dataset.slot = slot;
+        tools.innerHTML = `
+            <button type="button" class="edit-btn" data-action="change" title="${escapeHtml(state.slots[slot].label)}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span>Смени</span>
+            </button>
+            <button type="button" class="edit-btn edit-btn--ghost" data-action="reset"${state.slots[slot].changed ? '' : ' hidden'}><span>Върни оригинала</span></button>`;
+        host.appendChild(tools);
+    });
+
+    const send = async (slot, action, file) => {
+        const groups = document.querySelectorAll(`.edit-tools[data-slot="${slot}"]`);
+        groups.forEach((group) => group.classList.add('is-busy'));
+        const data = new FormData();
+        data.append('csrf', state.csrf);
+        data.append('slot', slot);
+        data.append('action', action);
+        if (file) data.append('image', file);
+        try {
+            const response = await fetch(`${API}edit.php`, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) throw new Error(result.error || 'Снимката не беше запазена.');
+            document.querySelectorAll('img').forEach((img) => { if (slotOf(img) === slot) img.src = result.url; });
+            document.querySelectorAll(`a[href^="${state.slots[slot].file}"]`).forEach((link) => { link.href = result.url; });
+            state.slots[slot].changed = result.changed;
+            groups.forEach((group) => { group.querySelector('[data-action="reset"]').hidden = !result.changed; });
+            say(action === 'reset' ? 'Върната е оригиналната снимка.' : 'Снимката е запазена.');
+        } catch (error) {
+            say(error.message, true);
+        } finally {
+            groups.forEach((group) => group.classList.remove('is-busy'));
+        }
+    };
+
+    // Capture phase: the logo and the price list sit inside links
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.edit-tools button');
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const slot = button.closest('.edit-tools').dataset.slot;
+        if (button.dataset.action === 'change') {
+            pending = slot;
+            picker.click();
+        } else if (confirm('Да върна ли оригиналната снимка?')) {
+            send(slot, 'reset');
+        }
+    }, true);
+    picker.addEventListener('change', () => {
+        if (picker.files[0] && pending) send(pending, 'change', picker.files[0]);
+        picker.value = '';
+    });
+}
+
+/* ---------- Privacy policy in a dialog (keeps what was typed in the form) ---------- */
+function initPrivacyDialog() {
+    const links = document.querySelectorAll('[data-privacy-dialog]');
+    if (!links.length || typeof HTMLDialogElement !== 'function') return;
+    let dialog = null;
+    let activeCheckbox = null;
+
+    const build = async () => {
+        dialog = document.createElement('dialog');
+        dialog.className = 'policy-dialog';
+        dialog.setAttribute('aria-labelledby', 'policy-title');
+        dialog.innerHTML = `
+            <div class="policy-head">
+                <h2 id="policy-title">Политика за поверителност</h2>
+                <button type="button" class="policy-close" aria-label="Затвори">${ICONS.close}</button>
+            </div>
+            <div class="policy-body legal" tabindex="-1"><p class="loading-note">Зареждане...</p></div>
+            <div class="policy-foot">
+                <button type="button" class="btn btn--ghost" data-policy-close>Затвори</button>
+                <button type="button" class="btn" data-policy-accept>Запознат/а съм</button>
+            </div>`;
+        document.body.appendChild(dialog);
+        const close = () => dialog.close();
+        dialog.querySelector('.policy-close').addEventListener('click', close);
+        dialog.querySelector('[data-policy-close]').addEventListener('click', close);
+        dialog.querySelector('[data-policy-accept]').addEventListener('click', () => {
+            if (activeCheckbox) {
+                activeCheckbox.checked = true;
+                activeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            close();
+        });
+        dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
+        dialog.addEventListener('close', () => document.body.classList.remove('no-scroll'));
+        try {
+            const html = await (await fetch('privacy.html')).text();
+            const article = new DOMParser().parseFromString(html, 'text/html').querySelector('.legal');
+            dialog.querySelector('.policy-body').innerHTML = article ? article.innerHTML : '';
+        } catch (error) {
+            dialog.querySelector('.policy-body').innerHTML = '<p><a href="privacy.html" target="_blank">Отворете политиката в нов раздел</a></p>';
+        }
+    };
+
+    links.forEach((link) => {
+        link.addEventListener('click', async (event) => {
+            event.preventDefault();
+            activeCheckbox = link.closest('label')?.querySelector('input[type="checkbox"]') || null;
+            if (!dialog) await build();
+            dialog.showModal();
+            document.body.classList.add('no-scroll');
+            const body = dialog.querySelector('.policy-body');
+            body.scrollTop = 0;
+            body.focus({ preventScroll: true });
+        });
+    });
+}
+
 /* ---------- Copy contacts ---------- */
 function initCopy() {
     document.querySelectorAll('[data-copy]').forEach((button) => {
@@ -763,16 +824,16 @@ function initCopy() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    splitWords();
     initMenu();
     initScrollEffects();
     observeReveal();
     addStars();
     document.querySelectorAll('[data-count]').forEach(countUp);
     initCopy();
-    document.querySelectorAll('form[data-sheet]').forEach(initForm);
+    document.querySelectorAll('form[data-form]').forEach(initForm);
     loadReviews();
     loadEvents();
     loadGallery();
-    loadPriceList();
+    initEditor();
+    initPrivacyDialog();
 });

@@ -12,7 +12,7 @@
     <meta property="og:url" content="https://www.sibebe.bg/academy.html">
     <meta property="og:title" content="Академия за родители | SI BEBE">
     <meta property="og:description" content="Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.">
-    <meta property="og:image" content="https://www.sibebe.bg/assets/img/og-image.jpg">
+    <meta property="og:image" content="https://www.sibebe.bg/media/share.jpg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
@@ -21,13 +21,24 @@
     <link rel="icon" type="image/png" href="assets/img/favicon.png">
     <link rel="stylesheet" href="assets/css/fonts.css">
     <link rel="stylesheet" href="assets/css/style.css">
-    <script>document.documentElement.classList.add('js');</script>
+    <link rel="preload" href="assets/fonts/nunito-cyrillic-TMnFcQIG.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/onest-cyrillic-oEoeyxMI.woff2" as="font" type="font/woff2" crossorigin>
+    <script>
+        // Entrance animations play once per visit; later pages and refreshes show content straight away
+        (function (d) {
+            d.classList.add('js');
+            try {
+                if (sessionStorage.getItem('sibebe-seen')) d.classList.add('is-return');
+                sessionStorage.setItem('sibebe-seen', '1');
+            } catch (e) {}
+        })(document.documentElement);
+    </script>
 </head>
 <body>
     <div class="scroll-progress" aria-hidden="true"></div>
     <header class="site-header">
         <div class="container">
-            <a class="brand" href="index.html" aria-label="SI BEBE, начало"><img src="assets/img/logo-purple.webp" alt="SI BEBE" width="56" height="56"></a>
+            <a class="brand" href="index.html" aria-label="SI BEBE, начало"><img src="media/logo.webp" alt="SI BEBE" width="56" height="56"></a>
             <nav class="nav" id="site-nav" aria-label="Главно меню">
                 <ul class="nav-list">
                     <li><a class="nav-link" href="index.html">Начало</a></li>
@@ -73,7 +84,7 @@
                 </div>
                 <div class="intro-media">
                     <div class="blob blob--back" aria-hidden="true"></div>
-                    <div class="blob"><img src="assets/img/missions.webp" alt="Възпитателка играе с две малки деца на масичка с дървени играчки" width="360" height="450"></div>
+                    <div class="blob"><img src="media/academy-intro.webp" alt="Възпитателка играе с две малки деца на масичка с дървени играчки" width="360" height="450"></div>
                 </div>
             </div>
         </section>
@@ -133,7 +144,7 @@
         <span class="footer-stars" aria-hidden="true"></span>
         <div class="container footer-grid">
             <div class="footer-brand">
-                <a class="footer-logo" href="index.html" aria-label="SI BEBE, начало"><img src="assets/img/logo-purple.webp" alt="SI BEBE" width="72" height="72" loading="lazy"></a>
+                <a class="footer-logo" href="index.html" aria-label="SI BEBE, начало"><img src="media/logo.webp" alt="SI BEBE" width="72" height="72" loading="lazy"></a>
                 <p>Център за ранна грижа и развитие</p>
                 <div class="footer-socials">
                     <a href="https://www.facebook.com/profile.php?id=61555541437681" target="_blank" rel="noopener" aria-label="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
