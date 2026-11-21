@@ -805,6 +805,8 @@ mark {
 .contact-list p { margin: 0; }
 .copy { padding: 0; border: 0; background: none; color: var(--plum); font-weight: 600; cursor: copy; border-bottom: 1px dashed currentColor; }
 .copy:hover { color: var(--plum-700); }
+.contact-link { color: var(--plum); font-weight: 600; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
+.contact-link:hover { color: var(--plum-700); border-bottom-color: currentColor; }
 .socials, .footer-socials { display: flex; gap: 10px; }
 .socials a, .footer-socials a {
     display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%;
