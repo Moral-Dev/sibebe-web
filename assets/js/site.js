@@ -41,7 +41,12 @@ function initMenu() {
     };
 
     toggle.addEventListener('click', () => setOpen(!header.classList.contains('nav-open')));
-    header.querySelectorAll('.nav a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+    // Close the menu only for links within this page; for another page the new page simply replaces it,
+    // so the closing animation is never frozen half-way while the browser switches pages
+    header.querySelectorAll('.nav a').forEach((link) => link.addEventListener('click', () => {
+        const target = new URL(link.href, location.href);
+        if (target.pathname === location.pathname) setOpen(false);
+    }));
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && header.classList.contains('nav-open')) { setOpen(false); toggle.focus(); }
     });
