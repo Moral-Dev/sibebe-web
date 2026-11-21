@@ -29,6 +29,7 @@ jobs:
           out="$RUNNER_TEMP/out"
           mkdir -p "$out"
           rsync -a --exclude tools/ --exclude .gitignore --exclude .DS_Store site/ "$out/"
+          echo "${GITHUB_SHA::7}" > "$out/build.txt"   # lets us check from outside which version the server has
           cd "$out"
           git init -q -b superhosting
           git add -A
