@@ -1,0 +1,37 @@
+# Builds the site in site/ and publishes the ready files to the "superhosting" branch.
+# The server pulls that branch by itself (cron job in cPanel), so GitHub needs no access to the hosting.
+name: Build for SuperHosting
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/build-superhosting.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: superhosting
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build pages
+        run: python3 site/tools/build.py
+
+      - name: Publish to the superhosting branch
+        run: |
+          out="$RUNNER_TEMP/out"
+          mkdir -p "$out"
+          rsync -a --exclude tools/ --exclude .gitignore --exclude .DS_Store site/ "$out/"
+          cd "$out"
+          git init -q -b superhosting
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -qm "Site build from ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" superhosting
