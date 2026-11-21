@@ -3069,3 +3069,9 @@ html.palette-warm .age-scale-bar span:nth-child(1) { background: #C9D6C2; }
 html.palette-warm .age-scale-bar span:nth-child(2) { background: #A9BC9F; }
 html.palette-warm .age-cards .card:nth-child(1) { border-top-color: #C9D6C2; }
 html.palette-warm .age-cards .card:nth-child(2) { border-top-color: #A9BC9F; }
+
+/* Booking form on a light background */
+#booking-section .booking-card {
+    border: 1px solid var(--line);
+    box-shadow: 0 20px 50px rgba(43, 22, 74, 0.12);
+}
