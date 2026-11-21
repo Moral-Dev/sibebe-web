@@ -197,17 +197,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (header && menuToggle && navLinks) {
-        menuToggle.addEventListener('click', () => {
-            const isOpen = header.classList.toggle('nav-open');
+        // The phone menu fills the screen below the header and scrolls on its own
+        const setMenuTop = () => {
+            document.documentElement.style.setProperty('--menu-top', `${Math.round(header.getBoundingClientRect().bottom)}px`);
+        };
+
+        const setMenuOpen = (isOpen) => {
+            header.classList.toggle('nav-open', isOpen);
             menuToggle.setAttribute('aria-expanded', String(isOpen));
-        });
+            menuToggle.setAttribute('aria-label', isOpen ? 'Затвори меню' : 'Отвори меню');
+            document.body.classList.toggle('menu-open', isOpen);
+            if (isOpen) setMenuTop();
+            else closeSubmenus();
+        };
+
+        menuToggle.addEventListener('click', () => setMenuOpen(!header.classList.contains('nav-open')));
 
         navLinks.addEventListener('click', (event) => {
-            if (event.target.closest('a')) {
-                header.classList.remove('nav-open');
-                menuToggle.setAttribute('aria-expanded', 'false');
-                closeSubmenus();
+            if (event.target.closest('a')) setMenuOpen(false);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && header.classList.contains('nav-open')) {
+                setMenuOpen(false);
+                menuToggle.focus();
             }
+        });
+
+        window.addEventListener('resize', () => {
+            if (!header.classList.contains('nav-open')) return;
+            if (window.innerWidth > 1400) setMenuOpen(false);
+            else setMenuTop();
         });
     }
 
