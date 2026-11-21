@@ -7,3 +7,4 @@
 /uploads/*
 !/uploads/.htaccess
 /maintenance.flag
+/api/texts.php

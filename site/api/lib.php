@@ -12,7 +12,7 @@ const GALLERY_CATEGORIES = [
     'events' => 'Събития',
     'interior' => 'Интериор',
 ];
-// While this file exists only logged-in admins see the site (see gate.php and .htaccess)
+// While this file exists only logged-in admins see the site (see render.php and .htaccess)
 const MAINTENANCE_FLAG = __DIR__ . '/../maintenance.flag';
 const CHILD_AGES = ['0–6 месеца', '6–12 месеца', '12–24 месеца', '24–36 месеца'];
 
@@ -397,11 +397,49 @@ function save_slot(array $file, string $slot): void
     } else {
         throw new RuntimeException('Сървърът не може да преобразува този формат. Качете снимка във формат ' . strtoupper($ext) . '.');
     }
+    keep_previous_slot($slot);
     if (!$ok || !rename($tmp, $target)) {
         @unlink($tmp);
         throw new RuntimeException('Снимката не можа да бъде записана.');
     }
     set_setting('slot:' . $slot, date('c'));
+}
+
+/* media/logo.prev.webp: the photo that was there before the last change, for "restore previous". */
+function slot_prev_path(string $slot): string
+{
+    $file = __DIR__ . '/../' . slots()[$slot]['file'];
+    return preg_replace('/\.(\w+)$/', '.prev.$1', $file);
+}
+
+function keep_previous_slot(string $slot): void
+{
+    $file = __DIR__ . '/../' . slots()[$slot]['file'];
+    if (is_file($file)) {
+        @copy($file, slot_prev_path($slot));
+    }
+}
+
+/* Swaps the current photo with the previous one, so pressing it again undoes the undo. */
+function undo_slot(string $slot): void
+{
+    $slots = slots();
+    if (!isset($slots[$slot]) || !is_file(slot_prev_path($slot))) {
+        throw new RuntimeException('Няма предишна снимка.');
+    }
+    $file = __DIR__ . '/../' . $slots[$slot]['file'];
+    $prev = slot_prev_path($slot);
+    $tmp = $file . '.swap';
+    if (!copy($file, $tmp) || !copy($prev, $file) || !rename($tmp, $prev)) {
+        @unlink($tmp);
+        throw new RuntimeException('Предишната снимка не можа да бъде върната.');
+    }
+    $default = __DIR__ . '/../' . $slots[$slot]['default'];
+    if (is_file($default) && md5_file($default) === md5_file($file)) {
+        db()->prepare("DELETE FROM settings WHERE name = ?")->execute(['slot:' . $slot]);
+    } else {
+        set_setting('slot:' . $slot, date('c'));
+    }
 }
 
 function reset_slot(string $slot): void
@@ -410,6 +448,7 @@ function reset_slot(string $slot): void
     if (!isset($slots[$slot])) {
         return;
     }
+    keep_previous_slot($slot);
     if (!copy(__DIR__ . '/../' . $slots[$slot]['default'], __DIR__ . '/../' . $slots[$slot]['file'])) {
         throw new RuntimeException('Оригиналната снимка не можа да бъде върната.');
     }
@@ -422,3 +461,174 @@ function delete_upload(?string $path): void
         @unlink(__DIR__ . '/../' . $path);
     }
 }
+
+
+/* ---------- Texts edited on the page ---------- */
+// Saved texts live in the settings table as "text:<key>"; api/texts.php is a cache that render.php reads.
+const TEXT_CACHE = __DIR__ . '/texts.php';
+const TEXT_TAGS = 'h1|h2|h3|h4|p|li|figcaption|span';
+
+/* ['texts' => [key => html], 'replace' => [old link => new link]] */
+function text_overrides(): array
+{
+    $cache = is_file(TEXT_CACHE) ? include TEXT_CACHE : null;
+    return is_array($cache) && isset($cache['texts']) ? $cache : ['texts' => [], 'replace' => []];
+}
+
+function rebuild_text_cache(): void
+{
+    $texts = [];
+    $replace = [];
+    foreach (db()->query("SELECT name, value FROM settings WHERE name LIKE 'text:%'") as $row) {
+        $key = substr($row['name'], 5);
+        $texts[$key] = $row['value'];
+        // A changed phone or e-mail also moves every link and copy button that pointed to the old one
+        $kind = text_kind($key);
+        $old = $kind === 'tel' || $kind === 'email' ? original_text($key) : null;
+        if ($old !== null) {
+            $old = html_entity_decode($old, ENT_QUOTES, 'UTF-8');
+            $new = html_entity_decode(strip_tags($row['value']), ENT_QUOTES, 'UTF-8');
+            if ($kind === 'tel') {
+                $replace['href="tel:' . preg_replace('/[^\d+]/', '', $old) . '"'] = 'href="' . phone_href($new) . '"';
+                $replace['href="' . phone_href($old) . '"'] = 'href="' . phone_href($new) . '"';
+            } else {
+                $replace['href="mailto:' . $old . '"'] = 'href="mailto:' . htmlspecialchars($new, ENT_QUOTES, 'UTF-8') . '"';
+                $replace['data-copy="' . $old . '"'] = 'data-copy="' . htmlspecialchars($new, ENT_QUOTES, 'UTF-8') . '"';
+            }
+        }
+    }
+    $tmp = TEXT_CACHE . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    file_put_contents($tmp, "<?php\n// Texts changed on the site. Generated from the database; do not edit.\nreturn " . var_export(['texts' => $texts, 'replace' => $replace], true) . ";\n");
+    if (!@rename($tmp, TEXT_CACHE)) {
+        @unlink($tmp);
+        throw new RuntimeException('Текстът не можа да бъде записан. Проверете правата на папка api.');
+    }
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(TEXT_CACHE, true);
+    }
+}
+
+/* Puts the saved texts into a page before it is sent. */
+function apply_text_overrides(string $html, array $cache): string
+{
+    $texts = $cache['texts'] ?? [];
+    if (!$texts) {
+        return $html;
+    }
+    $html = preg_replace_callback(
+        '#<(' . TEXT_TAGS . ')\b([^>]*\bdata-edit="([a-f0-9]{12})"[^>]*)>([\s\S]*?)</\1>#',
+        fn ($m) => isset($texts[$m[3]]) ? "<{$m[1]}{$m[2]}>{$texts[$m[3]]}</{$m[1]}>" : $m[0],
+        $html
+    ) ?? $html;
+    return $cache['replace'] ? strtr($html, $cache['replace']) : $html;
+}
+
+/* 0879 919 779 -> tel:+359879919779 */
+function phone_href(string $text): string
+{
+    $digits = preg_replace('/[^\d+]/', '', $text);
+    if (str_starts_with($digits, '00')) {
+        $digits = '+' . substr($digits, 2);
+    } elseif (str_starts_with($digits, '0')) {
+        $digits = '+359' . substr($digits, 1);
+    }
+    return 'tel:' . $digits;
+}
+
+/* What kind of text a key is: label, tel or email (buttons and contacts), or '' for normal text. */
+function text_kind(string $key): string
+{
+    foreach (glob(__DIR__ . '/../*.html') ?: [] as $file) {
+        if (preg_match('#\bdata-edit="' . preg_quote($key, '#') . '"\s+data-edit-kind="(\w+)"#', (string) file_get_contents($file), $m)) {
+            return $m[1];
+        }
+    }
+    return '';
+}
+
+/* Buttons and contacts hold plain words only; phones and e-mails are checked. */
+function clean_plain_text(string $html, string $kind): string
+{
+    $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')));
+    if ($kind === 'tel' && strlen(preg_replace('/\D/', '', $text)) < 6) {
+        throw new RuntimeException('Въведете телефонен номер.');
+    }
+    if ($kind === 'email' && !filter_var($text, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Въведете валиден имейл.');
+    }
+    return htmlspecialchars(mb_substr($text, 0, 200), ENT_NOQUOTES, 'UTF-8');
+}
+
+/* The text as it is in the site files, for "restore original". Null when the key is not on any page. */
+function original_text(string $key): ?string
+{
+    if (!preg_match('/^[a-f0-9]{12}$/', $key)) {
+        return null;
+    }
+    foreach (glob(__DIR__ . '/../*.html') ?: [] as $file) {
+        if (preg_match('#<(' . TEXT_TAGS . ')\b[^>]*\bdata-edit="' . $key . '"[^>]*>([\s\S]*?)</\1>#', (string) file_get_contents($file), $m)) {
+            return $m[2];
+        }
+    }
+    return null;
+}
+
+/* Keeps plain text with bold, italic, line breaks and safe links; everything else is removed. */
+function clean_text_html(string $html): string
+{
+    $html = str_replace(["\r", "\n"], ' ', $html);
+    $html = preg_replace('#<(script|style|template)\b[\s\S]*?</\1>#i', '', $html);
+    $html = preg_replace('#<div[^>]*>|</div>|<p[^>]*>|</p>#i', '<br>', $html);
+    $html = strip_tags($html, '<strong><em><b><i><br><a>');
+    $html = preg_replace_callback('#<(/?)(strong|em|b|i|br|a)\b([^>]*)>#i', function ($m) {
+        $tag = strtolower($m[2]);
+        if ($m[1] === '/') {
+            return $tag === 'br' ? '' : "</{$tag}>";
+        }
+        if ($tag === 'a') {
+            if (preg_match('#\bhref\s*=\s*("([^"]*)"|\'([^\']*)\')#i', $m[3], $h)) {
+                $href = html_entity_decode($h[2] !== '' ? $h[2] : ($h[3] ?? ''), ENT_QUOTES, 'UTF-8');
+                if (preg_match('#^(https?://|mailto:|tel:|/|\#|[a-z0-9-]+(\#[\w-]*)?$)#i', $href)) {
+                    return '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">';
+                }
+            }
+            return '<a>';
+        }
+        return "<{$tag}>";
+    }, $html);
+    $html = preg_replace('#(<br>\s*)+$#', '', trim(preg_replace('/\s+/u', ' ', $html)));
+    return mb_substr($html, 0, 5000);
+}
+
+/* One step of history per text: "textprev:<key>" holds what was shown before the last change.
+   ORIGINAL_TEXT marks that the previous version was the text from the site files. */
+const ORIGINAL_TEXT = "__sibebe_original__";
+
+function current_text(string $key): ?string
+{
+    return setting('text:' . $key);
+}
+
+/* Shows $html (null = the original text) and remembers what was there before. */
+function set_text(string $key, ?string $html): void
+{
+    $before = current_text($key);
+    set_setting('textprev:' . $key, $before ?? ORIGINAL_TEXT);
+    if ($html === null) {
+        db()->prepare("DELETE FROM settings WHERE name = ?")->execute(['text:' . $key]);
+    } else {
+        set_setting('text:' . $key, $html);
+    }
+    rebuild_text_cache();
+}
+
+/* The version to go back to, or false when there is none. Null means the original text. */
+function previous_text(string $key)
+{
+    $prev = setting('textprev:' . $key);
+    if ($prev === null) {
+        return false;
+    }
+    return $prev === ORIGINAL_TEXT ? null : $prev;
+}
+

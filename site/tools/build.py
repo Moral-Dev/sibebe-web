@@ -204,6 +204,10 @@ def asset_version(path):
         return hashlib.md5(f.read()).hexdigest()[:8]
 
 
+# The handwritten "Sí bebé" on the home page, in the spirit of the logo lettering
+SCRIPT_PRELOAD = '\n    <link rel="preload" href="assets/fonts/allura-latin-400.woff2" as="font" type="font/woff2" crossorigin>'
+
+
 def page(key, title, description, body):
     url = f'{SITE_URL}/' if key == 'index' else f'{SITE_URL}/{key}'
     return f'''<!DOCTYPE html>
@@ -229,7 +233,7 @@ def page(key, title, description, body):
     <link rel="stylesheet" href="assets/css/fonts.css">
     <link rel="stylesheet" href="assets/css/style.css?v={asset_version('assets/css/style.css')}">
     <link rel="preload" href="assets/fonts/nunito-cyrillic-TMnFcQIG.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="assets/fonts/onest-cyrillic-oEoeyxMI.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/onest-cyrillic-oEoeyxMI.woff2" as="font" type="font/woff2" crossorigin>{SCRIPT_PRELOAD if key == 'index' else ''}
     <script>
         // Entrance animations play once per visit; later pages and refreshes show content straight away
         (function (d) {{
@@ -381,7 +385,7 @@ def build_home():
             {deco('ring', 'bottom:10%;left:6%;--s:52px;--c:var(--mint-500);--dur:9s', 0.15)}
             <div class="container">
                 <div class="hero-text">
-                    <h1><span class="brand-word">Sí bebé -<svg class="brand-squiggle" viewBox="0 0 200 16" preserveAspectRatio="none" aria-hidden="true"><path d="M3 10c18-8 30-8 48 0s30 8 48 0 30-8 48 0 30 8 48 0"/></svg></span> всяко начало е изпълнено с обич и открития.</h1>
+                    <h1><span class="brand-word"><span class="brand-script">Sí bebé</span> -<svg class="brand-squiggle" viewBox="0 0 200 16" preserveAspectRatio="none" aria-hidden="true"><path d="M3 10c18-8 30-8 48 0s30 8 48 0 30-8 48 0 30 8 48 0"/></svg></span> всяко начало е изпълнено с обич и открития.</h1>
                     <p class="lead">Добре дошли в нашето защитено пространство за най-малките. Тук бебетата опознават света чрез сетивата си, а родителите откриват подкрепа и споделеност. Съчетаваме грижата на семейството с експертизата на специалистите.</p>
                     <div class="btn-row">
                         <a class="btn" href="contact.html#booking">Запиши час {svg('arrow', 18, 2.2)}</a>
@@ -1029,7 +1033,89 @@ def clean_links(html):
     return re.sub(r'href="(/?[a-z0-9-]+)\.html(#[^"]*)?"', lambda m: f'href="{m.group(1)}{m.group(2) or ""}"', html)
 
 
+# ---------- Texts an admin can edit on the page ----------
+# Every heading, paragraph and list item that holds only text (plus bold/italic/links/line breaks)
+# gets data-edit="<key>". The key is a hash of the original text, so the same sentence on several
+# pages (footer, booking band) is edited once everywhere. render.php swaps in the saved versions.
+import hashlib
+
+EDIT_TAGS = 'h1|h2|h3|h4|p|li|figcaption'
+BLOCKING = r'h[1-6]|p|li|div|ul|ol|section|article|figure|form|nav|header|footer|main|svg|span|button|label|select|input|img|textarea|iframe|blockquote|table|dialog|picture|video'
+EDITABLE = re.compile(
+    r'<(' + EDIT_TAGS + r')((?:\s[^>]*)?)>((?:(?!</?(?:' + BLOCKING + r')\b)[\s\S])*?)</\1>')
+NO_EDIT_ZONES = re.compile(r'<head>[\s\S]*?</head>|<form\b[\s\S]*?</form>')
+
+# Buttons and contact links: only their words are editable, so the label is wrapped in a span.
+# data-edit-kind tells the server what it holds: a phone (the tel: link follows it), an e-mail
+# (mailto: link and the copy button follow it) or a plain button label.
+ONE_SVG = r'<svg\b(?:(?!</svg>)[\s\S])*</svg>'  # a single icon, never running into the next element
+LABEL_FIRST = re.compile(r'<(a|button)(\s[^>]*)>(\s*)([^<]*[^\s<])(\s*)(' + ONE_SVG + r')?(\s*)</\1>')
+ICON_FIRST = re.compile(r'<(a|button)(\s[^>]*)>(\s*' + ONE_SVG + r'\s*)([^<]*[^\s<])(\s*)</\1>')
+TOGGLE_LABEL = re.compile(r'<span class="(when-closed|when-open)">([^<]+)</span>')
+
+
+def label_kind(tag, attrs, text):
+    if re.search(r'\bhref="tel:', attrs):
+        return 'tel'
+    if re.search(r'\bhref="mailto:', attrs) or (re.search(r'\bdata-copy="', attrs) and '@' in text):
+        return 'email'
+    if tag == 'button' or re.search(r'\bclass="[^"]*\bbtn\b', attrs):
+        return 'label'
+    return None
+
+
+def edit_span(kind, text):
+    return f'<span data-edit="{text_key(kind + ":" + text)}" data-edit-kind="{kind}">{text}</span>'
+
+
+def mark_controls(html):
+    def label_first(m):
+        tag, attrs, sp1, text, sp2, icon, sp3 = m.groups()
+        kind = label_kind(tag, attrs, text)
+        if not kind or 'data-edit' in attrs:
+            return m.group(0)
+        return f'<{tag}{attrs}>{sp1}{edit_span(kind, text)}{sp2}{icon or ""}{sp3}</{tag}>'
+
+    def icon_first(m):
+        tag, attrs, icon, text, sp = m.groups()
+        kind = label_kind(tag, attrs, text)
+        if not kind or 'data-edit' in attrs:
+            return m.group(0)
+        return f'<{tag}{attrs}>{icon}{edit_span(kind, text)}{sp}</{tag}>'
+
+    html = LABEL_FIRST.sub(label_first, html)
+    html = ICON_FIRST.sub(icon_first, html)
+    return TOGGLE_LABEL.sub(lambda m: f'<span class="{m.group(1)}" data-edit="{text_key("label:" + m.group(2))}" data-edit-kind="label">{m.group(2)}</span>', html)
+
+
+def text_key(inner):
+    return hashlib.sha1(re.sub(r'\s+', ' ', inner).strip().encode('utf-8')).hexdigest()[:12]
+
+
+def mark_editable(html):
+    head, sep, body = html.partition('</head>')
+    html = head + sep + mark_controls(body)
+    zones = []
+
+    def hide(m):
+        zones.append(m.group(0))
+        return f'\x00{len(zones) - 1}\x00'
+
+    html = NO_EDIT_ZONES.sub(hide, html)
+
+    def mark(m):
+        tag, attrs, inner = m.group(1), m.group(2), m.group(3)
+        if not inner.strip() or 'loading-note' in attrs or 'data-edit' in attrs or 'data-edit' in inner or '\x00' in inner:
+            return m.group(0)
+        if re.fullmatch(r'\s*<a\b[^>]*>[^<]*</a>\s*', inner):  # menu and phone links stay links
+            return m.group(0)
+        return f'<{tag}{attrs} data-edit="{text_key(inner)}">{inner}</{tag}>'
+
+    html = EDITABLE.sub(mark, html)
+    return re.sub(r'\x00(\d+)\x00', lambda m: zones[int(m.group(1))], html)
+
+
 for name, fn in PAGES.items():
     with open(os.path.join(OUT, name), 'w') as f:
-        f.write(clean_links(fn()))
+        f.write(mark_editable(clean_links(fn())))
 print('built', ', '.join(PAGES))

@@ -355,6 +355,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 reset_slot((string) ($_POST['slot'] ?? ''));
                 flash('Върната е оригиналната снимка.');
                 go('images');
+            case 'slot_undo':
+                undo_slot((string) ($_POST['slot'] ?? ''));
+                flash('Върната е предишната снимка.');
+                go('images');
 
             case 'password':
                 $stmt = $pdo->prepare("SELECT password_hash FROM admins WHERE username = ?");
@@ -719,6 +723,9 @@ function page_images(): void
                                 <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required aria-label="Нова снимка за <?= h($slot['label']) ?>">
                                 <button class="btn btn--small" type="submit">Смени</button>
                             </form>
+                            <?php if (is_file(slot_prev_path($key))): ?>
+                                <form method="post" data-confirm="Да върна ли предишната снимка?"><?= csrf_field() ?><input type="hidden" name="action" value="slot_undo"><input type="hidden" name="slot" value="<?= h($key) ?>"><button class="btn btn--small btn--ghost" type="submit">Върни предишната</button></form>
+                            <?php endif; ?>
                             <?php if ($changed): ?>
                                 <form method="post" data-confirm="Да върна ли оригиналната снимка?"><?= csrf_field() ?><input type="hidden" name="action" value="slot_reset"><input type="hidden" name="slot" value="<?= h($key) ?>"><button class="btn btn--small btn--ghost" type="submit">Върни оригинала</button></form>
                             <?php endif; ?>
@@ -817,51 +824,7 @@ function render_head(string $title): void
 function render_foot(): void
 {
     ?>
-<script>
-// Toasts float over the page, close on click and hide by themselves
-document.querySelectorAll('.toast').forEach(function (toast, i) {
-    var close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'toast-close';
-    close.setAttribute('aria-label', 'Затвори');
-    close.innerHTML = '&times;';
-    toast.appendChild(close);
-    document.body.appendChild(toast);
-    var hide = function () { toast.classList.add('is-leaving'); setTimeout(function () { toast.remove(); }, 300); };
-    close.addEventListener('click', hide);
-    setTimeout(hide, toast.classList.contains('toast--error') ? 7000 : 4000);
-});
-// Eye button to show or hide every password field
-(function () {
-    var eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-    var eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7c1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
-    document.querySelectorAll('input[type="password"]').forEach(function (input) {
-        var wrap = document.createElement('span');
-        wrap.className = 'pw-wrap';
-        input.parentNode.insertBefore(wrap, input);
-        wrap.appendChild(input);
-        var button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'pw-toggle';
-        button.setAttribute('aria-label', 'Покажи паролата');
-        button.setAttribute('aria-pressed', 'false');
-        button.innerHTML = eye;
-        button.addEventListener('click', function () {
-            var show = input.type === 'password';
-            input.type = show ? 'text' : 'password';
-            button.innerHTML = show ? eyeOff : eye;
-            button.setAttribute('aria-label', show ? 'Скрий паролата' : 'Покажи паролата');
-            button.setAttribute('aria-pressed', String(show));
-            input.focus();
-        });
-        wrap.appendChild(button);
-    });
-})();
-document.addEventListener('submit', function (e) {
-    var msg = e.target.getAttribute('data-confirm');
-    if (msg && !confirm(msg)) e.preventDefault();
-});
-</script>
+<script src="admin.js?v=<?= @filemtime(__DIR__ . '/admin.js') ?>"></script>
 </body>
 </html>
 <?php

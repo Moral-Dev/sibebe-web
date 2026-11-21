@@ -127,11 +127,19 @@ function addStars() {
     document.querySelectorAll('[data-stars], .footer-stars').forEach((host) => {
         const layer = host.classList.contains('footer-stars') ? host : document.createElement('div');
         if (layer !== host) { layer.className = 'stars-layer'; host.prepend(layer); }
-        const count = window.innerWidth < 640 ? 22 : 46;
+        // Three groups that fade on their own beat: looks random, costs three animations instead of dozens
+        const groups = [['3.1s', '0s'], ['4.3s', '-1.6s'], ['2.6s', '-3.2s']].map(([t, d]) => {
+            const group = document.createElement('div');
+            group.className = 'star-group';
+            group.style.cssText = `--t:${t};--d:${d}`;
+            layer.appendChild(group);
+            return group;
+        });
+        const count = window.innerWidth < 640 ? 15 : 24;
         for (let i = 0; i < count; i += 1) {
             const star = document.createElement('i');
-            star.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;--z:${(Math.random() * 2.6 + 1.4).toFixed(1)}px;--t:${(Math.random() * 3 + 2).toFixed(1)}s;--d:${(Math.random() * -5).toFixed(1)}s`;
-            layer.appendChild(star);
+            star.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;--z:${(Math.random() * 2.4 + 1.6).toFixed(1)}px`;
+            groups[i % 3].appendChild(star);
         }
     });
 }
@@ -659,7 +667,41 @@ function shakeButton(button) {
     button.classList.add('is-error');
 }
 
-/* ---------- On-page photo editor (only for a logged-in admin) ---------- */
+/* Own confirm dialog for the editor (instead of the browser's) */
+let askBox = null;
+function ask(message) {
+    return new Promise((resolve) => {
+        if (!askBox) {
+            askBox = document.createElement('div');
+            askBox.className = 'edit-ask';
+            askBox.innerHTML = `<div class="edit-ask-card" role="alertdialog" aria-modal="true" aria-labelledby="edit-ask-text">
+                <p id="edit-ask-text"></p>
+                <div class="edit-ask-actions"><button type="button" class="btn btn--ghost" data-ask="no">Отказ</button><button type="button" class="btn" data-ask="yes">Да</button></div>
+            </div>`;
+            document.body.appendChild(askBox);
+        }
+        askBox.querySelector('p').textContent = message;
+        const yes = askBox.querySelector('[data-ask="yes"]');
+        const no = askBox.querySelector('[data-ask="no"]');
+        const done = (answer) => {
+            askBox.classList.remove('is-open');
+            document.removeEventListener('keydown', onKey, true);
+            resolve(answer);
+        };
+        const onKey = (event) => {
+            if (event.key === 'Escape') { event.preventDefault(); done(false); }
+            if (event.key === 'Tab') { event.preventDefault(); (document.activeElement === yes ? no : yes).focus(); }
+        };
+        yes.onclick = () => done(true);
+        no.onclick = () => done(false);
+        askBox.onclick = (event) => { if (event.target === askBox) done(false); };
+        document.addEventListener('keydown', onKey, true);
+        askBox.classList.add('is-open');
+        yes.focus();
+    });
+}
+
+/* ---------- On-page editor for photos and texts (only for a logged-in admin) ---------- */
 async function initEditor() {
     if (!document.cookie.split('; ').includes('sibebe_editor=1')) return;
     let state;
@@ -681,7 +723,7 @@ async function initEditor() {
     bar.className = 'edit-bar';
     bar.innerHTML = `
         <span class="edit-bar-dot" aria-hidden="true"></span>
-        <span class="edit-bar-text"><b>Режим на редакция</b><span> Посочете снимка и натиснете „Смени“.</span></span>
+        <span class="edit-bar-text"><b>Режим на редакция</b><span> Кликнете върху текст, за да го промените, или посочете снимка.</span></span>
         <button type="button" data-edit-toggle aria-pressed="false">Скрий бутоните</button>
         <a href="admin/">Админ панел</a>`;
     document.body.appendChild(bar);
@@ -724,7 +766,8 @@ async function initEditor() {
             <button type="button" class="edit-btn" data-action="change" title="${escapeHtml(state.slots[slot].label)}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span>Смени</span>
             </button>
-            <button type="button" class="edit-btn edit-btn--ghost" data-action="reset"${state.slots[slot].changed ? '' : ' hidden'}><span>Върни оригинала</span></button>`;
+            <button type="button" class="edit-btn edit-btn--ghost" data-action="undo"${state.slots[slot].prev ? '' : ' hidden'} title="Върни предишната снимка"><span>Предишната</span></button>
+            <button type="button" class="edit-btn edit-btn--ghost" data-action="reset"${state.slots[slot].changed ? '' : ' hidden'} title="Върни оригиналната снимка"><span>Оригинала</span></button>`;
         host.appendChild(tools);
     });
 
@@ -743,8 +786,12 @@ async function initEditor() {
             document.querySelectorAll('img').forEach((img) => { if (slotOf(img) === slot) img.src = result.url; });
             document.querySelectorAll(`a[href^="${state.slots[slot].file}"]`).forEach((link) => { link.href = result.url; });
             state.slots[slot].changed = result.changed;
-            groups.forEach((group) => { group.querySelector('[data-action="reset"]').hidden = !result.changed; });
-            say(action === 'reset' ? 'Върната е оригиналната снимка.' : 'Снимката е запазена.');
+            state.slots[slot].prev = result.prev;
+            groups.forEach((group) => {
+                group.querySelector('[data-action="reset"]').hidden = !result.changed;
+                group.querySelector('[data-action="undo"]').hidden = !result.prev;
+            });
+            say({ reset: 'Върната е оригиналната снимка.', undo: 'Върната е предишната снимка.' }[action] || 'Снимката е запазена.');
         } catch (error) {
             say(error.message, true);
         } finally {
@@ -762,13 +809,160 @@ async function initEditor() {
         if (button.dataset.action === 'change') {
             pending = slot;
             picker.click();
-        } else if (confirm('Да върна ли оригиналната снимка?')) {
-            send(slot, 'reset');
+        } else if (button.dataset.action === 'undo') {
+            send(slot, 'undo');
+        } else {
+            ask('Да върна ли оригиналната снимка?').then((yes) => { if (yes) send(slot, 'reset'); });
         }
     }, true);
     picker.addEventListener('change', () => {
         if (picker.files[0] && pending) send(pending, 'change', picker.files[0]);
         picker.value = '';
+    });
+
+    initTextEditor(state, say);
+}
+
+/* 0879 919 779 -> +359879919779, the same rule as the server */
+const phoneHref = (text) => {
+    let digits = text.replace(/[^\d+]/g, '');
+    if (digits.startsWith('00')) digits = `+${digits.slice(2)}`;
+    else if (digits.startsWith('0')) digits = `+359${digits.slice(1)}`;
+    return digits;
+};
+
+/* Texts: click a highlighted text, type, then Save. Same text on other pages changes with it. */
+function initTextEditor(state, say) {
+    const root = document.documentElement;
+    const changed = new Set(state.texts || []);
+    const withPrev = new Set(state.textPrev || []);
+    const nodes = (key) => document.querySelectorAll(`[data-edit="${key}"]`);
+    document.querySelectorAll('[data-edit]').forEach((el) => el.classList.add('edit-text'));
+
+    const bar = document.createElement('div');
+    bar.className = 'edit-textbar';
+    bar.hidden = true;
+    bar.innerHTML = `
+        <button type="button" class="edit-btn" data-text="save">Запази</button>
+        <button type="button" class="edit-btn edit-btn--ghost" data-text="cancel">Отказ</button>
+        <button type="button" class="edit-btn edit-btn--ghost" data-text="undo">Предишния</button>
+        <button type="button" class="edit-btn edit-btn--ghost" data-text="reset">Оригинала</button>`;
+    document.body.appendChild(bar);
+
+    let current = null;
+    let before = '';
+    const place = () => {
+        if (!current) return;
+        const box = current.getBoundingClientRect();
+        const height = bar.offsetHeight;
+        const top = box.top - height - 10 < 8 ? box.bottom + 10 : box.top - height - 10;
+        bar.style.top = `${Math.round(top)}px`;
+        bar.style.left = `${Math.round(Math.min(Math.max(box.left, 8), window.innerWidth - bar.offsetWidth - 8))}px`;
+    };
+    const finish = () => {
+        current.contentEditable = 'false';
+        current.classList.remove('is-text-editing');
+        current = null;
+        bar.hidden = true;
+    };
+    const cancel = () => {
+        current.innerHTML = before;
+        finish();
+    };
+    const start = async (el) => {
+        if (current && current.innerHTML !== before && !(await ask('Да отхвърля ли промените по текста?'))) return;
+        if (current) cancel();
+        current = el;
+        before = el.innerHTML;
+        el.contentEditable = 'true';
+        el.classList.add('is-text-editing');
+        bar.hidden = false;
+        bar.querySelector('[data-text="reset"]').hidden = !changed.has(el.dataset.edit);
+        bar.querySelector('[data-text="undo"]').hidden = !withPrev.has(el.dataset.edit);
+        el.focus({ preventScroll: true });
+        place();
+        requestAnimationFrame(place);
+    };
+    const save = async (action) => {
+        const el = current;
+        const key = el.dataset.edit;
+        bar.classList.add('is-busy');
+        const data = new FormData();
+        data.append('csrf', state.csrf);
+        data.append('action', action);
+        data.append('key', key);
+        data.append('html', el.innerHTML);
+        try {
+            const response = await fetch(`${API}edit.php`, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) throw new Error(result.error || 'Текстът не беше запазен.');
+            finish();
+            nodes(key).forEach((node) => {
+                node.innerHTML = result.html;
+                const text = node.textContent.trim();
+                const link = node.closest('a[href^="tel:"], a[href^="mailto:"]');
+                if (link && node.dataset.editKind === 'tel') link.href = `tel:${phoneHref(text)}`;
+                if (link && node.dataset.editKind === 'email') link.href = `mailto:${text}`;
+                const copy = node.closest('[data-copy]');
+                if (copy && node.dataset.editKind === 'email') copy.dataset.copy = text;
+            });
+            if (result.changed) changed.add(key); else changed.delete(key);
+            if (result.prev) withPrev.add(key); else withPrev.delete(key);
+            say({ text_reset: 'Върнат е оригиналният текст.', text_undo: 'Върнат е предишният текст.' }[action] || 'Текстът е запазен.');
+        } catch (error) {
+            say(error.message, true);
+        } finally {
+            bar.classList.remove('is-busy');
+        }
+    };
+
+    bar.addEventListener('mousedown', (event) => event.preventDefault()); // keep the caret in the text
+    bar.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button || !current || bar.classList.contains('is-busy')) return;
+        if (button.dataset.text === 'save') save('text_save');
+        else if (button.dataset.text === 'cancel') cancel();
+        else if (button.dataset.text === 'undo') save('text_undo');
+        else ask('Да върна ли оригиналния текст?').then((yes) => { if (yes) save('text_reset'); });
+    });
+
+    // Capture phase, so links and "read more" buttons around a text do not fire while editing
+    document.addEventListener('click', (event) => {
+        if (root.classList.contains('edit-hidden') || event.target.closest('.edit-textbar, .edit-bar, .edit-tools')) return;
+        const el = event.target.closest('[data-edit]');
+        if (el && el === current) {
+            event.preventDefault(); // a label inside a link or button must not open or submit it
+            return;
+        }
+        if (!el) return;
+        event.preventDefault();
+        event.stopPropagation();
+        start(el);
+    }, true);
+
+    document.addEventListener('keydown', (event) => {
+        if (!current || !current.contains(event.target)) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            cancel();
+        } else if (event.key === 'Enter' && event.shiftKey) {
+            event.preventDefault();
+            document.execCommand('insertLineBreak');
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            save('text_save');
+        }
+    });
+    // Pasted text comes in plain, without the formatting of the page it was copied from
+    document.addEventListener('paste', (event) => {
+        if (!current || !current.contains(event.target)) return;
+        event.preventDefault();
+        document.execCommand('insertText', false, (event.clipboardData || window.clipboardData).getData('text/plain'));
+    });
+    window.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    window.addEventListener('beforeunload', (event) => {
+        if (current && current.innerHTML !== before) event.preventDefault();
     });
 }
 
@@ -848,6 +1042,16 @@ function initCopy() {
     });
 }
 
+/* ---------- Animations rest while their part of the page is off screen ---------- */
+function initAnimationPausing() {
+    if (!('IntersectionObserver' in window)) return;
+    const parts = document.querySelectorAll('main > section, main > .marquee, main > div, .site-footer');
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => entry.target.classList.toggle('anim-paused', !entry.isIntersecting));
+    }, { rootMargin: '120px 0px' });
+    parts.forEach((part) => io.observe(part));
+}
+
 /* ---------- Photos: soft shimmer while loading, then fade in ---------- */
 function initImageLoading() {
     const watch = (img) => {
@@ -879,6 +1083,7 @@ function initImageLoading() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initImageLoading();
+    initAnimationPausing();
     initMenu();
     initScrollEffects();
     observeReveal();

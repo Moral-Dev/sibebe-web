@@ -32,13 +32,13 @@ ErrorDocument 404 /404.html
     # /about/ -> /about
     RewriteCond %{DOCUMENT_ROOT}/$1.html -f
     RewriteRule ^([a-z0-9-]+)/$ /$1 [L,R=301]
-    # While maintenance.flag exists, only logged-in admins see the pages (gate.php decides);
-    # visitors get the "coming soon" page. Switched on and off in the admin panel.
-    RewriteCond %{DOCUMENT_ROOT}/maintenance.flag -f
-    RewriteRule ^([a-z0-9-]*)$ gate.php?page=$1 [L,QSA]
-    # /about serves about.html
+    # Pages go through render.php: it adds the texts edited on the site and, while maintenance.flag
+    # exists, shows the "coming soon" page to everyone except logged-in admins
+    RewriteRule ^$ render.php?page= [L,QSA]
     RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-    RewriteRule ^([a-z0-9-]+)$ $1.html [L]
+    RewriteRule ^([a-z0-9-]+)$ render.php?page=$1 [L,QSA]
+    RewriteCond %{DOCUMENT_ROOT}/maintenance.flag -f
+    RewriteRule ^([a-z0-9-]+)$ render.php?page=$1 [L,QSA]
 
     # Keep build tools and dot files private
     RewriteRule ^(tools|\.git)(/|$) - [F,L]
