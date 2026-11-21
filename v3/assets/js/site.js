@@ -1,4 +1,4 @@
-/* SI BEBE v2: menu, motion, content from the site API, gallery, forms. */
+/* Sí bebé v2: menu, motion, content from the site API, gallery, forms. */
 
 // Content and forms are served by the site's own PHP API (api/content.php, api/submit.php)
 const API = 'api/';
@@ -206,7 +206,7 @@ async function fetchContent(type) {
     return response.json();
 }
 
-const placeholder = (type) => `<div class="placeholder">${type === 'event' ? ICONS.calendar : ICONS.photo}<span>${type === 'event' ? 'Събитие в SI BEBE' : 'Снимката не е налична'}</span></div>`;
+const placeholder = (type) => `<div class="placeholder">${type === 'event' ? ICONS.calendar : ICONS.photo}<span>${type === 'event' ? 'Събитие в Sí bebé' : 'Снимката не е налична'}</span></div>`;
 
 document.addEventListener('error', (event) => {
     const img = event.target;
@@ -316,7 +316,7 @@ async function loadGallery() {
     try {
         items = (await fetchContent('gallery')).map((item) => ({
             url: String(item.url || '').trim(),
-            alt: String(item.alt || 'Снимка от SI BEBE').trim(),
+            alt: String(item.alt || 'Снимка от Sí bebé').trim(),
             category: item.category || '',
         })).filter((item) => item.url);
         render('all');
