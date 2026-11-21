@@ -609,9 +609,11 @@ const MESSAGES = {
     required: 'Моля, попълнете това поле.',
     select: 'Моля, изберете от списъка.',
     email: 'Моля, въведете валиден имейл адрес.',
+    consent: 'Моля, потвърдете, че сте се запознали с Политиката за поверителност.',
 };
 
 const fieldMessage = (field) => {
+    if (field.type === 'checkbox' && field.validity.valueMissing) return MESSAGES.consent;
     if (field.validity.valueMissing) return field.tagName === 'SELECT' ? MESSAGES.select : MESSAGES.required;
     if (field.validity.typeMismatch) return MESSAGES.email;
     return '';
@@ -683,6 +685,7 @@ function initForm(form) {
 
         const submit = form.querySelector('[type="submit"]');
         submit.disabled = true;
+        submit.classList.add('is-loading');
         const data = new FormData(form);
         data.append('sheet', form.dataset.sheet);
         data.append('submitted_at', new Date().toISOString());
@@ -693,14 +696,53 @@ function initForm(form) {
         try {
             await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: data });
             form.reset();
-            showStatus(form, 'success', 'Благодарим Ви! Ще се свържем с Вас скоро.');
+            form.querySelector('.form-status')?.setAttribute('hidden', '');
+            showFormSuccess(form, 'Благодарим Ви! Ще се свържем с Вас скоро.');
         } catch (error) {
             console.error(error);
             showStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+            shakeButton(submit);
         } finally {
             submit.disabled = false;
+            submit.classList.remove('is-loading');
         }
     });
+}
+
+/* ---------- Submit animation: spinner on the button, then a success panel ---------- */
+function showFormSuccess(form, message) {
+    const host = form.parentElement;
+    host.querySelector('.form-success')?.remove();
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const panel = document.createElement('div');
+    panel.className = 'form-success';
+    panel.setAttribute('role', 'status');
+    panel.setAttribute('aria-live', 'polite');
+    const confetti = Array.from({ length: 12 }, (_, i) => `<i style="--a:${i * 30}deg;--c:${i % 4}"></i>`).join('');
+    panel.innerHTML = `
+        <div class="form-success-icon">
+            <span class="form-success-confetti" aria-hidden="true">${confetti}</span>
+            <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="M15.5 27l7 7 14-15"/></svg>
+        </div>
+        <p></p>
+        <button type="button" class="btn">Добре</button>`;
+    panel.querySelector('p').textContent = message;
+    host.appendChild(panel);
+    const close = () => {
+        if (!panel.isConnected) return;
+        panel.classList.add('is-leaving');
+        setTimeout(() => panel.remove(), 400);
+    };
+    panel.querySelector('button').addEventListener('click', close);
+    panel.querySelector('button').focus({ preventScroll: true });
+    setTimeout(close, 8000);
+}
+
+function shakeButton(button) {
+    if (!button) return;
+    button.classList.remove('is-error');
+    void button.offsetWidth;
+    button.classList.add('is-error');
 }
 
 /* ---------- Copy contacts ---------- */

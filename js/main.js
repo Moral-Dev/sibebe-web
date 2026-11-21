@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <a href="tel:0879919779"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0879 919 779</a>
                         <a href="tel:0882915978"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> 0882 915 978</a>
                     </div>
-                    <p class="footer-copyright">&copy; 2026 SI BEBE. All rights reserved.</p>
+                    <p class="footer-copyright">&copy; 2026 SI BEBE. All rights reserved.<br><a class="footer-privacy" href="${pagePath('privacy')}" data-key="legal.privacy">Политика за поверителност</a></p>
                     <div class="footer-social">
                         <a href="https://www.facebook.com/profile.php?id=61555541437681" target="_blank" aria-label="Facebook">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
@@ -981,7 +981,8 @@ async function submitGoogleSheetForm(form, sheetName, successMessage, extraField
     });
 
     form.reset();
-    showFormStatus(form, 'success', successMessage);
+    form.querySelector('.form-status')?.setAttribute('hidden', '');
+    showFormSuccess(form, successMessage);
 }
 
 // ---------- Form messages shown on the page instead of browser pop-ups ----------
@@ -989,9 +990,11 @@ const FIELD_MESSAGES = {
     required: 'Моля, попълнете това поле.',
     select: 'Моля, изберете от списъка.',
     email: 'Моля, въведете валиден имейл адрес.',
+    consent: 'Моля, потвърдете, че сте се запознали с Политиката за поверителност.',
 };
 
 const getFieldMessage = (field) => {
+    if (field.type === 'checkbox' && field.validity.valueMissing) return FIELD_MESSAGES.consent;
     if (field.validity.valueMissing) {
         return field.tagName === 'SELECT' ? FIELD_MESSAGES.select : FIELD_MESSAGES.required;
     }
@@ -1070,7 +1073,10 @@ function showFormStatus(form, state, message) {
 
 function setFormBusy(form, isBusy) {
     const button = form.querySelector('[type="submit"]');
-    if (button) button.disabled = isBusy;
+    if (button) {
+        button.disabled = isBusy;
+        button.classList.toggle('is-loading', isBusy);
+    }
     form.setAttribute('aria-busy', String(isBusy));
 }
 
@@ -1227,6 +1233,7 @@ function initBookingForm() {
             } catch (error) {
                 console.error('Error submitting booking form:', error);
                 showFormStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+                shakeButton(form.querySelector('[type="submit"]'));
             } finally {
                 setFormBusy(form, false);
             }
@@ -1256,6 +1263,7 @@ function initPartnerForm() {
             } catch (error) {
                 console.error('Error submitting partner form:', error);
                 showFormStatus(form, 'error', 'Възникна грешка. Моля, опитайте отново.');
+                shakeButton(form.querySelector('[type="submit"]'));
             } finally {
                 setFormBusy(form, false);
             }
@@ -1313,3 +1321,39 @@ document.addEventListener('DOMContentLoaded', () => {
     initPartnerForm();
     initCopyContacts();
 });
+
+/* ---------- Submit animation: spinner on the button, then a success panel ---------- */
+function showFormSuccess(form, message) {
+    const host = form.parentElement;
+    host.querySelector('.form-success')?.remove();
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const panel = document.createElement('div');
+    panel.className = 'form-success';
+    panel.setAttribute('role', 'status');
+    panel.setAttribute('aria-live', 'polite');
+    const confetti = Array.from({ length: 12 }, (_, i) => `<i style="--a:${i * 30}deg;--c:${i % 4}"></i>`).join('');
+    panel.innerHTML = `
+        <div class="form-success-icon">
+            <span class="form-success-confetti" aria-hidden="true">${confetti}</span>
+            <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="M15.5 27l7 7 14-15"/></svg>
+        </div>
+        <p></p>
+        <button type="button" class="btn">Добре</button>`;
+    panel.querySelector('p').textContent = message;
+    host.appendChild(panel);
+    const close = () => {
+        if (!panel.isConnected) return;
+        panel.classList.add('is-leaving');
+        setTimeout(() => panel.remove(), 400);
+    };
+    panel.querySelector('button').addEventListener('click', close);
+    panel.querySelector('button').focus({ preventScroll: true });
+    setTimeout(close, 8000);
+}
+
+function shakeButton(button) {
+    if (!button) return;
+    button.classList.remove('is-error');
+    void button.offsetWidth;
+    button.classList.add('is-error');
+}

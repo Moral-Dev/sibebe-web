@@ -16,9 +16,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" type="image/png" href="../assets/icons/favicon.png">
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css?family=Noto+Sans:400,700|Montserrat:700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/fonts.css">
     <script>
         // Second version in the warm palette: ?palette=warm (remembered for this tab), ?palette=default to go back.
         try {
@@ -145,6 +143,10 @@
                                     <option value="12-24 месеца">12-24 месеца</option>
                                     <option value="24-36 месеца">24-36 месеца</option>
                                 </select>
+                            </div>
+
+                            <div class="form-field form-consent">
+                                <label class="consent"><input type="checkbox" name="privacy_ack" value="Да" required> <span><span data-key="legal.consent_pre">Запознат/а съм с</span> <a href="privacy.html" data-page-link="privacy" target="_blank" data-key="legal.consent_link">Политиката за поверителност</a>.</span></label>
                             </div>
 
                             <button type="submit" class="btn">Запиши се</button>

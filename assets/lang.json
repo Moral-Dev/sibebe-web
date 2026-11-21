@@ -247,6 +247,11 @@
     },
     "contact": {
       "directions": "Упътване"
+    },
+    "legal": {
+      "privacy": "Политика за поверителност",
+      "consent_pre": "Запознат/а съм с",
+      "consent_link": "Политиката за поверителност"
     }
   },
   "en": {
@@ -497,6 +502,11 @@
     },
     "contact": {
       "directions": "Directions"
+    },
+    "legal": {
+      "privacy": "Privacy Policy",
+      "consent_pre": "I have read the",
+      "consent_link": "Privacy Policy"
     }
   }
 }

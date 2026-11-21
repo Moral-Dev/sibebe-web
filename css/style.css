@@ -3174,3 +3174,69 @@ html.palette-warm .age-cards .card:nth-child(2) { border-top-color: #A9BC9F; }
         padding: 12px 18px;
     }
 }
+
+/* ---------- Privacy: consent checkbox, map placeholder, policy page ---------- */
+.consent { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; cursor: pointer; line-height: 1.5; }
+.consent input { width: 20px; height: 20px; min-height: 0; margin: 2px 0 0; padding: 0; flex-shrink: 0; accent-color: var(--secondary-color); cursor: pointer; }
+.consent a { color: var(--secondary-color); text-decoration: underline; }
+.footer-privacy { color: inherit; text-decoration: underline; font-size: .9em; }
+.legal { max-width: 820px; margin: 0 auto; }
+.legal h2 { font-size: 1.35rem; margin: 2em 0 .6em; }
+.legal ul { padding-left: 1.2em; margin: 0 0 1em; }
+.legal li { margin-bottom: .5em; }
+.legal a { color: var(--secondary-color); text-decoration: underline; }
+.legal-updated { color: var(--text-color); opacity: .75; font-size: .95rem; }
+.legal-fill { background: #FFF3C4; padding: 0 4px; border-radius: 4px; }
+
+/* Keep the standard Cyrillic letter shapes (the self-hosted fonts include Bulgarian alternates) */
+html { font-feature-settings: "locl" 0; }
+.consent span { color: var(--text-color); }
+.site-form .consent input, .site-form .consent input:focus { box-shadow: none; border: 0; outline: none; }
+.site-form .consent input:focus-visible { outline: 2px solid var(--secondary-color); outline-offset: 2px; }
+
+/* ---------- Form submit animation ---------- */
+.btn.is-loading { position: relative; color: transparent !important; pointer-events: none; }
+.btn.is-loading::before {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    border: 3px solid rgba(255, 255, 255, .35); border-top-color: #fff; border-radius: 50%;
+    animation: btn-spin .7s linear infinite;
+}
+.btn.is-error { animation: btn-shake .45s; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@keyframes btn-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.form-success {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    padding: 32px; text-align: center; border-radius: inherit;
+    background: rgba(255, 255, 255, .97);
+    animation: fs-in .45s cubic-bezier(.22, 1, .36, 1) both;
+}
+.form-success.is-leaving { animation: fs-out .4s ease both; }
+.form-success p { max-width: 360px; margin: 0; font-size: 1.15rem; font-weight: 600; color: var(--heading-color); animation: fs-rise .5s .7s both; }
+.form-success .btn { animation: fs-rise .5s .85s both; }
+.form-success-icon { position: relative; width: 96px; height: 96px; }
+.form-success-icon svg { position: relative; width: 100%; height: 100%; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.form-success-icon circle { stroke: #3EAA80; stroke-width: 3; stroke-dasharray: 145; stroke-dashoffset: 145; animation: fs-draw .6s .1s ease-out forwards; fill: #E8F5EE; }
+.form-success-icon path { stroke: #3EAA80; stroke-width: 4; stroke-dasharray: 40; stroke-dashoffset: 40; animation: fs-draw .35s .55s ease-out forwards; }
+.form-success-confetti { position: absolute; inset: 0; }
+.form-success-confetti i {
+    position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%; opacity: 0;
+    animation: fs-burst .9s .55s cubic-bezier(.22, 1, .36, 1) both;
+}
+.form-success-confetti i:nth-child(4n+1) { background: var(--secondary-color); }
+.form-success-confetti i:nth-child(4n+2) { background: #e7db92; border-radius: 2px; }
+.form-success-confetti i:nth-child(4n+3) { background: #9A8CE0; }
+.form-success-confetti i:nth-child(4n+4) { background: #3EAA80; border-radius: 2px; }
+@keyframes fs-in { from { opacity: 0; transform: scale(.97); } }
+@keyframes fs-out { to { opacity: 0; transform: scale(.98); } }
+@keyframes fs-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes fs-draw { to { stroke-dashoffset: 0; } }
+@keyframes fs-burst {
+    0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(.4); }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(-78px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .form-success-icon circle, .form-success-icon path { stroke-dashoffset: 0; animation: none; }
+    .form-success-confetti { display: none; }
+}
+.btn.is-loading:disabled { opacity: 1; }

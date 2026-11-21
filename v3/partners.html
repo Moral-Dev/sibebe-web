@@ -8,9 +8,7 @@
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#FFF8F1">
     <link rel="icon" type="image/png" href="assets/img/favicon.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Onest:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="assets/css/fonts.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <script>document.documentElement.classList.add('js');</script>
 </head>
@@ -108,6 +106,9 @@
                             <label for="p-phone">Телефон <span>*</span></label>
                             <input id="p-phone" type="tel" name="phone" placeholder="+359" autocomplete="tel" required>
                         </div>
+                        <div class="field field--consent">
+                            <label class="consent"><input type="checkbox" name="privacy_ack" value="Да" required> <span>Запознат/а съм с <a href="privacy.html" target="_blank">Политиката за поверителност</a>.</span></label>
+                        </div>
                         <button type="submit" class="btn">Изпрати</button>
                     </form>
                 </div>
@@ -154,7 +155,7 @@
             </div>
         </div>
         <div class="container footer-bottom">
-            <p>&copy; 2026 SI BEBE. All rights reserved.</p>
+            <p>&copy; 2026 SI BEBE. All rights reserved. <a href="privacy.html">Политика за поверителност</a></p>
         </div>
     </footer>
     <script src="assets/js/site.js"></script>
