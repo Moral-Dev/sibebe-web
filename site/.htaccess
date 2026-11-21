@@ -1,0 +1,70 @@
+# SI BEBE – Apache settings for SuperHosting
+
+Options -Indexes -MultiViews
+
+# Server-only files are not for visitors (PHP limits, the "site hidden" switch, the deploy record)
+<FilesMatch "^(\.user\.ini|maintenance\.flag|\.ftp-deploy-sync-state\.json)$">
+    Require all denied
+</FilesMatch>
+DirectoryIndex index.html index.php
+ErrorDocument 404 /404.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Always HTTPS and sibebe.bg without www (other host names, e.g. a temporary hosting address, are left alone)
+    RewriteCond %{HTTP_HOST} ^www\.sibebe\.bg$ [NC]
+    RewriteRule ^ https://sibebe.bg%{REQUEST_URI} [L,R=301,NE]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP_HOST} ^sibebe\.bg$ [NC]
+    RewriteRule ^ https://sibebe.bg%{REQUEST_URI} [L,R=301,NE]
+
+    # Old addresses from the previous site
+    RewriteRule ^(home|index)/?$ / [L,R=301]
+    RewriteRule ^pages/([a-z-]+)\.html$ /$1 [L,R=301]
+    RewriteRule ^warm/?$ / [L,R=301]
+
+    # Addresses without .html: /about.html -> /about (only when the visitor asked for .html)
+    RewriteCond %{THE_REQUEST} \s/+index\.html[\s?] [NC]
+    RewriteRule ^ / [L,R=301]
+    RewriteCond %{THE_REQUEST} \s/+([a-z0-9-]+)\.html[\s?] [NC]
+    RewriteRule ^ /%1 [L,R=301]
+    # /about/ -> /about
+    RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+    RewriteRule ^([a-z0-9-]+)/$ /$1 [L,R=301]
+    # While maintenance.flag exists, only logged-in admins see the pages (gate.php decides);
+    # visitors get the "coming soon" page. Switched on and off in the admin panel.
+    RewriteCond %{DOCUMENT_ROOT}/maintenance.flag -f
+    RewriteRule ^([a-z0-9-]*)$ gate.php?page=$1 [L,QSA]
+    # /about serves about.html
+    RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+    RewriteRule ^([a-z0-9-]+)$ $1.html [L]
+
+    # Keep build tools and dot files private
+    RewriteRule ^(tools|\.git)(/|$) - [F,L]
+    RewriteRule ^api/(config|lib)\.php$ - [F,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Strict-Transport-Security "max-age=31536000"
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript image/svg+xml application/json
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>

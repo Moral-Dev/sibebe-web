@@ -1,0 +1,11 @@
+# Replaceable site photos: always check for a newer version, never run scripts
+Options -Indexes
+<FilesMatch "\.(?i:php\d*|phtml|phar|pl|py|cgi|sh|tmp)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_expires.c>
+    ExpiresActive Off
+</IfModule>
+<IfModule mod_headers.c>
+    Header set Cache-Control "no-cache"
+</IfModule>

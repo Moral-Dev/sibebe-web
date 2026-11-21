@@ -1,0 +1,4 @@
+# Only the public endpoints can be opened from the browser
+<FilesMatch "^(?!content\.php$|submit\.php$|edit\.php$).*">
+    Require all denied
+</FilesMatch>
