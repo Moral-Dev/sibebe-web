@@ -357,7 +357,7 @@ main { position: relative; }
 .brand-word { position: relative; display: inline-block; color: var(--plum); white-space: nowrap; }
 .brand-squiggle {
     position: absolute; left: 0; bottom: -.14em; width: calc(100% - .3em); height: .26em;
-    fill: none; stroke: var(--peach-500); stroke-width: 5; stroke-linecap: round;
+    overflow: visible; fill: none; stroke: var(--peach-500); stroke-width: 5; stroke-linecap: round;
     stroke-dasharray: 260; stroke-dashoffset: 260;
     animation: draw 1.4s var(--ease) .9s forwards;
 }
@@ -856,8 +856,8 @@ mark {
 .footer-bottom { margin-top: 60px; padding: 24px; border-top: 1px solid rgba(255, 255, 255, .1); text-align: center; font-size: .88rem; color: rgba(255, 255, 255, .5); z-index: 1; }
 
 /* ---------- Privacy: consent, map placeholder, policy page ---------- */
-.consent { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; line-height: 1.5; color: var(--text); }
-.form .consent input { width: 22px; height: 22px; min-height: 0; margin: 1px 0 0; padding: 0; flex-shrink: 0; accent-color: var(--plum); cursor: pointer; }
+.consent, .field .consent { display: flex; align-items: center; gap: 12px; cursor: pointer; line-height: 1.5; color: var(--text); margin-bottom: 0; }
+.form .consent input { width: 22px; height: 22px; min-height: 0; margin: 0; padding: 0; flex-shrink: 0; accent-color: var(--plum); cursor: pointer; }
 .consent a { text-decoration: underline; font-weight: 600; }
 .footer-bottom a { color: rgba(255, 255, 255, .75); text-decoration: underline; margin-left: 8px; }
 .page-intro--legal { padding-bottom: 80px; }
