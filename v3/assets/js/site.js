@@ -784,11 +784,11 @@ function initPrivacyDialog() {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
         dialog.addEventListener('close', () => document.body.classList.remove('no-scroll'));
         try {
-            const html = await (await fetch('privacy.html')).text();
+            const html = await (await fetch('privacy')).text();
             const article = new DOMParser().parseFromString(html, 'text/html').querySelector('.legal');
             dialog.querySelector('.policy-body').innerHTML = article ? article.innerHTML : '';
         } catch (error) {
-            dialog.querySelector('.policy-body').innerHTML = '<p><a href="privacy.html" target="_blank">Отворете политиката в нов раздел</a></p>';
+            dialog.querySelector('.policy-body').innerHTML = '<p><a href="privacy" target="_blank">Отворете политиката в нов раздел</a></p>';
         }
     };
 
