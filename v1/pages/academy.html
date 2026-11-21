@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="bg-BG">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI BEBE - Академия за родители</title>
+    <meta name="description" content="Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SI BEBE">
+    <meta property="og:locale" content="bg_BG">
+    <meta property="og:title" content="Академия за родители | SI BEBE">
+    <meta property="og:description" content="Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.">
+    <meta property="og:image" content="https://moral-dev.github.io/sibebe-web/images/og-image.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/png" href="../assets/icons/favicon.png">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/fonts.css">
+    <script>
+        // Second version in the warm palette: ?palette=warm (remembered for this tab), ?palette=default to go back.
+        try {
+            var palette = new URLSearchParams(location.search).get('palette');
+            if (palette) sessionStorage.setItem('sibebe-palette', palette);
+            if ((palette || sessionStorage.getItem('sibebe-palette')) === 'warm') document.documentElement.classList.add('palette-warm');
+        } catch (e) {}
+    </script>
+</head>
+<body>
+    <div id="site-header"></div>
+
+    <main class="academy-page">
+        <section class="page-header hero-care">
+            <div class="container">
+                <h1 data-key="nav.academy">Академия за родители</h1>
+            </div>
+        </section>
+
+        <section id="academy-intro">
+            <div class="container">
+                <div class="split">
+                    <figure class="split-media">
+                        <img src="../images/hero-bg.webp" alt="Бебе играе с дървена играчка на килима" loading="lazy">
+                    </figure>
+                    <div class="split-body">
+                        <div class="section-title">
+                            <h2 data-key="academy.title">Вашето място за въпроси и отговори</h2>
+                        </div>
+                        <p data-key="academy.intro">Тук не сте сами в предизвикателствата на родителството.</p>
+                        <ul class="icon-list">
+                            <li class="icon-item">
+                                <span class="line-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+                                <div>
+                                    <h4 data-key="academy.item_1_title">Събития</h4>
+                                    <p data-key="academy.item_1_text">Предстоящи и минали лекции и семинари.</p>
+                                </div>
+                            </li>
+                            <li class="icon-item">
+                                <span class="line-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+                                <div>
+                                    <h4 data-key="academy.item_2_title">Психологическа подкрепа</h4>
+                                    <p data-key="academy.item_2_text">Групови и индивидуални сесии за преодоляване на следродилна депресия или родителски стрес.</p>
+                                </div>
+                            </li>
+                            <li class="icon-item">
+                                <span class="line-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a4 4 0 0 0 8 0V3"/><path d="M10 13v3a4 4 0 0 0 8 0v-2"/><circle cx="18" cy="12" r="2"/></svg></span>
+                                <div>
+                                    <h4 data-key="academy.item_3_title">Срещи с експерти</h4>
+                                    <p data-key="academy.item_3_text">Педиатри, консултанти по сън и захранване.</p>
+                                </div>
+                            </li>
+                            <li class="icon-item">
+                                <span class="line-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h11v8H8l-4 3z"/><path d="M15 9h5v8l-3-2h-6v-2"/></svg></span>
+                                <div>
+                                    <h4 data-key="academy.item_4_title">Родителска общност</h4>
+                                    <p data-key="academy.item_4_text">Дискусионен клуб за обмен на опит.</p>
+                                </div>
+                            </li>
+                            <li class="icon-item">
+                                <span class="line-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg></span>
+                                <div>
+                                    <h4 data-key="academy.item_5_title">Блог</h4>
+                                    <p data-key="academy.item_5_text">Статии на тема здраве, възпитание и игри у дома.</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="academy-cta" class="band-dark">
+            <div class="container cta-band-inner">
+                <div>
+                    <h2 data-key="home.cta_title">Запишете час онлайн</h2>
+                    <p data-key="home.cta_address">гр. Варна, ул. "Братя Миладинови" 68</p>
+                    <p data-key="home.cta_hours">Понеделник – Петък (7:30– 18:30) Събота и Неделя 9:00 - 17:00</p>
+                </div>
+                <div class="hero-actions">
+                    <a href="contact.html#booking" class="btn btn-light" data-page-link="contact" data-page-hash="booking" data-key="nav.book_now">Запиши час</a>
+                    <a href="contact.html" class="btn btn-outline-light" data-page-link="contact" data-key="contact.directions">Упътване</a>
+                </div>
+            </div>
+        </section>
+    </main>
+    <div id="site-footer"></div>
+
+    <script src="../js/main.js"></script>
+</body>
+</html>
