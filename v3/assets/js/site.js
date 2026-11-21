@@ -13,7 +13,7 @@ const ICONS = {
     chevron: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
 };
 
-const MONTHS = ['Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни', 'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'];
+const MONTHS = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'];
 
 const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -50,12 +50,22 @@ function initMenu() {
         if (window.innerWidth > 1180) setOpen(false); else setTop();
     });
 
+    // On desktop the menu also opens on hover, so the arrow must be able to close it too
+    const hoverMenu = window.matchMedia('(hover: hover) and (min-width: 1181px)');
     document.querySelectorAll('.sub-toggle').forEach((button) => {
+        const item = button.closest('.has-sub');
         button.addEventListener('click', (event) => {
             event.stopPropagation();
-            const item = button.closest('.has-sub');
-            const open = item.classList.toggle('is-open');
-            button.setAttribute('aria-expanded', String(open));
+            const shown = item.classList.contains('is-open') || (hoverMenu.matches && !item.classList.contains('is-closed'));
+            item.classList.toggle('is-open', !shown);
+            item.classList.toggle('is-closed', shown);
+            button.setAttribute('aria-expanded', String(!shown));
+        });
+        item.addEventListener('mouseleave', () => {
+            if (!hoverMenu.matches) return;
+            if (item.contains(document.activeElement)) document.activeElement.blur();
+            item.classList.remove('is-closed', 'is-open');
+            button.setAttribute('aria-expanded', 'false');
         });
     });
 
@@ -236,9 +246,9 @@ async function loadReviews() {
 /* Events */
 const formatDate = (date) => {
     const time = date.getHours() || date.getMinutes()
-        ? ` ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+        ? `, ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')} ч.`
         : '';
-    return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}${time}`;
+    return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} г.${time}`;
 };
 
 async function loadEvents() {
@@ -584,7 +594,15 @@ function initForm(form) {
         try {
             const response = await fetch(`${API}submit.php`, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
             const result = await response.json().catch(() => ({}));
-            if (!response.ok || !result.ok) throw new Error(result.error || `Submit failed: ${response.status}`);
+            if (!response.ok || !result.ok) {
+                // Mark the fields the server did not accept, e.g. a mistyped e-mail
+                (result.fields || []).forEach((name) => {
+                    const input = form.querySelector(`[name="${CSS.escape(name)}"]`);
+                    input?.classList.add('is-invalid');
+                    input?.closest('.field')?.classList.add('has-error');
+                });
+                throw new Error(result.error || `Submit failed: ${response.status}`);
+            }
             form.reset();
             form.querySelector('.form-status')?.setAttribute('hidden', '');
             showFormSuccess(form, 'Благодарим Ви! Ще се свържем с Вас скоро.');
@@ -784,9 +802,11 @@ function initPrivacyDialog() {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) close(); });
         dialog.addEventListener('close', () => document.body.classList.remove('no-scroll'));
         try {
-            const html = await (await fetch('privacy')).text();
-            const article = new DOMParser().parseFromString(html, 'text/html').querySelector('.legal');
-            dialog.querySelector('.policy-body').innerHTML = article ? article.innerHTML : '';
+            const response = await fetch('privacy');
+            if (!response.ok) throw new Error(`Privacy page: ${response.status}`);
+            const article = new DOMParser().parseFromString(await response.text(), 'text/html').querySelector('.legal');
+            if (!article) throw new Error('Privacy text not found');
+            dialog.querySelector('.policy-body').innerHTML = article.innerHTML;
         } catch (error) {
             dialog.querySelector('.policy-body').innerHTML = '<p><a href="privacy" target="_blank">Отворете политиката в нов раздел</a></p>';
         }
@@ -823,7 +843,37 @@ function initCopy() {
     });
 }
 
+/* ---------- Photos: soft shimmer while loading, then fade in ---------- */
+function initImageLoading() {
+    const watch = (img) => {
+        if (img.dataset.imgWatch) return;
+        img.dataset.imgWatch = '1';
+        if (img.complete) return;
+        // The logo only fades in; the shimmer box would look odd around a small round logo
+        const logo = Boolean(img.closest('.brand, .footer-logo'));
+        const show = logo ? 'logo-show' : 'img-show';
+        if (!logo) img.classList.add('img-wait');
+        img.addEventListener('load', () => {
+            img.classList.remove('img-wait');
+            if (reduceMotion) return;
+            img.classList.add(show);
+            img.addEventListener('animationend', (event) => {
+                if (event.animationName === show) img.classList.remove(show);
+            });
+        }, { once: true });
+        img.addEventListener('error', () => img.classList.remove('img-wait'), { once: true });
+    };
+    document.querySelectorAll('img').forEach(watch);
+    // Gallery, events and other photos added later by the page
+    new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'IMG') watch(node);
+        else node.querySelectorAll('img').forEach(watch);
+    }))).observe(document.body, { childList: true, subtree: true });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    initImageLoading();
     initMenu();
     initScrollEffects();
     observeReveal();
