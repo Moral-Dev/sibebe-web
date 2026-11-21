@@ -3029,3 +3029,43 @@ body.lightbox-open {
 #pricing .section-cta {
     margin-top: 36px;
 }
+
+/* Second version in the warm palette: active with ?palette=warm or the /warm/ address */
+html.palette-warm {
+    --secondary-color: #6A4C93;
+    --text-color: #5A5361;
+    --heading-color: #2B2533;
+    --bg-color: #FBF8F4;
+    --light-purple: #EFE6D9;
+    --sand: #EFE6D9;
+    --sage: #8FA286;
+    --sage-deep: #4F6448;
+    --sage-soft: #E3EADF;
+    --line: #E7DFD3;
+}
+
+html.palette-warm .btn,
+html.palette-warm .btn:hover {
+    color: var(--white);
+}
+
+html.palette-warm .btn-light {
+    color: var(--primary-color);
+}
+
+html.palette-warm .btn-outline {
+    color: var(--primary-color);
+}
+
+html.palette-warm .btn-outline:hover {
+    color: var(--white);
+}
+
+html.palette-warm #vision {
+    background: linear-gradient(rgba(43, 22, 74, 0.6), rgba(43, 22, 74, 0.6)), url('../images/vission.webp') center/cover no-repeat !important;
+}
+
+html.palette-warm .age-scale-bar span:nth-child(1) { background: #C9D6C2; }
+html.palette-warm .age-scale-bar span:nth-child(2) { background: #A9BC9F; }
+html.palette-warm .age-cards .card:nth-child(1) { border-top-color: #C9D6C2; }
+html.palette-warm .age-cards .card:nth-child(2) { border-top-color: #A9BC9F; }

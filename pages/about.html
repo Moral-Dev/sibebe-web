@@ -19,6 +19,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css?family=Noto+Sans:400,700|Montserrat:700&display=swap" rel="stylesheet">
+    <script>
+        // Second version in the warm palette: ?palette=warm (remembered for this tab), ?palette=default to go back.
+        try {
+            var palette = new URLSearchParams(location.search).get('palette');
+            if (palette) sessionStorage.setItem('sibebe-palette', palette);
+            if ((palette || sessionStorage.getItem('sibebe-palette')) === 'warm') document.documentElement.classList.add('palette-warm');
+        } catch (e) {}
+    </script>
 </head>
 <body>
     <div id="site-header"></div>
