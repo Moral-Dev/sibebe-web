@@ -366,3 +366,11 @@ input[type="checkbox"]:indeterminate { border-color: var(--plum); background: va
 .photo-pick { position: absolute; top: 16px; left: 16px; z-index: 2; display: block; padding: 4px; border-radius: 9px; background: rgba(255, 255, 255, .9); box-shadow: 0 2px 8px rgba(44, 16, 78, .25); }
 .photo.is-picked { box-shadow: 0 0 0 3px var(--plum), var(--shadow); }
 .photo.is-picked img { opacity: .85; }
+
+/* Request opened from the notification e-mail */
+.entry.is-target { box-shadow: 0 0 0 3px var(--plum), var(--shadow); animation: target-glow 1.6s ease 2; }
+@keyframes target-glow { 50% { box-shadow: 0 0 0 7px rgba(91, 62, 150, .25), var(--shadow); } }
+
+/* Buttons keep their word on one line */
+.btn { white-space: nowrap; }
+.entry-note button { flex-shrink: 0; }

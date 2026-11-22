@@ -91,9 +91,10 @@ try {
     $columns = implode(', ', array_keys($data));
     $marks = implode(', ', array_fill(0, count($data), '?'));
     db()->prepare("INSERT INTO {$table} ({$columns}) VALUES ({$marks})")->execute(array_values($data));
+    $newId = (int) db()->lastInsertId();
     record_hit('submit');
     purge_old_data();
-    notify($subject, $lines, $email);
+    notify($subject, $lines, $email, $table, $newId);
 
     json_out(['ok' => true]);
 } catch (Throwable $e) {
@@ -102,13 +103,15 @@ try {
 }
 
 /* E-mail to the centre. Contains only what the visitor typed, with a link to the admin panel. */
-function notify(string $subject, array $lines, string $replyTo): void
+function notify(string $subject, array $lines, string $replyTo, string $table, int $id): void
 {
     $host = preg_replace('/[^a-z0-9.:-]/i', '', $_SERVER['HTTP_HOST'] ?? 'sibebe.bg');
     $body = '';
     foreach ($lines as $label => $value) {
         $body .= $label . ': ' . str_replace(["\r", "\n"], ' ', $value) . "\n";
     }
-    $body .= "\nВсички заявки: https://{$host}/admin/\n";
+    // Straight to this request in the admin panel (after logging in, if needed)
+    $body .= "\nОтвори заявката: https://{$host}/admin/?p={$table}&entry={$id}\n";
+    $body .= "Всички заявки: https://{$host}/admin/?p={$table}\n";
     send_notification(str_replace(["\r", "\n"], ' ', $subject), $body, $replyTo);
 }

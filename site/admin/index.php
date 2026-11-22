@@ -193,6 +193,11 @@ if (empty($_SESSION['admin'])) {
                 session_regenerate_id(true);
                 $_SESSION['admin'] = $row['username'];
                 set_editor_marker(true);
+                // Back to the page the link pointed at, e.g. a request opened from the notification e-mail
+                $back = array_intersect_key($_GET, array_flip(['p', 'entry', 'view']));
+                if (preg_match('/^[a-z]+$/', (string) ($back['p'] ?? ''))) {
+                    go($back['p'], array_diff_key($back, ['p' => 1]));
+                }
                 go('dashboard');
             }
             record_hit('login');
@@ -635,7 +640,8 @@ function status_pill(string $status): string
 
 function page_entries(PDO $pdo, string $table): void
 {
-    $view = in_array($_GET['view'] ?? '', ['new', 'handled'], true) ? $_GET['view'] : 'all';
+    $target = (int) ($_GET['entry'] ?? 0); // a request opened from the notification e-mail
+    $view = !$target && in_array($_GET['view'] ?? '', ['new', 'handled'], true) ? $_GET['view'] : 'all';
     $where = $view === 'all' ? '' : "WHERE status = " . $pdo->quote($view);
     $rows = $pdo->query("SELECT * FROM {$table} {$where} ORDER BY created_at DESC")->fetchAll();
     $title = $table === 'bookings' ? 'Записвания за час' : 'Заявки за партньорство';
@@ -650,9 +656,12 @@ function page_entries(PDO $pdo, string $table): void
         <?php endforeach; ?>
     </div>
     <?php if (!$rows): ?><p class="panel muted">Няма заявки.</p><?php endif; ?>
+    <?php if ($target && !in_array($target, array_map('intval', array_column($rows, 'id')), true)): ?>
+        <div class="notice">Тази заявка вече не съществува – изтрита е или е по-стара от една година.</div>
+    <?php endif; ?>
     <div class="entries">
         <?php foreach ($rows as $r): ?>
-            <article class="entry<?= $r['status'] === 'new' ? ' entry--new' : '' ?>">
+            <article class="entry<?= $r['status'] === 'new' ? ' entry--new' : '' ?><?= (int) $r['id'] === $target ? ' is-target' : '' ?>" id="entry-<?= (int) $r['id'] ?>">
                 <div class="entry-head">
                     <div>
                         <?php if ($table === 'bookings'): ?>
