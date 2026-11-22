@@ -10,6 +10,7 @@ const ICONS = {
     prev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
     next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M8 7h8M8 11h6"/></svg>',
     chevron: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
 };
 
@@ -120,7 +121,9 @@ function observeReveal(root = document) {
         revealObserver.observe(el);
     };
     REVEAL.forEach(([selector, kind]) => root.querySelectorAll(selector).forEach((el) => mark(el, kind)));
-    root.querySelectorAll('.review, .event').forEach((el) => mark(el, ''));
+    // Card rows appear as one piece: cards off to the side would otherwise stay hidden
+    if (root.matches?.('.reviews, .event-row')) mark(root, '');
+    root.querySelectorAll('.event-row').forEach((el) => mark(el, ''));
 }
 
 function addStars() {
@@ -219,7 +222,11 @@ async function fetchContent(type) {
     return response.json();
 }
 
-const placeholder = (type) => `<div class="placeholder">${type === 'event' ? ICONS.calendar : ICONS.photo}<span>${type === 'event' ? 'Събитие в Sí bebé' : 'Снимката не е налична'}</span></div>`;
+const PLACEHOLDERS = { event: [ICONS.calendar, 'Събитие в Sí bebé'], article: [ICONS.book, 'Статия от Sí bebé'], photo: [ICONS.photo, 'Снимката не е налична'] };
+const placeholder = (type) => {
+    const [svg, text] = PLACEHOLDERS[type] || PLACEHOLDERS.photo;
+    return `<div class="placeholder">${svg}<span>${text}</span></div>`;
+};
 
 document.addEventListener('error', (event) => {
     const img = event.target;
@@ -227,7 +234,7 @@ document.addEventListener('error', (event) => {
     const box = img.closest('.event-media, .tile');
     if (!box || box.classList.contains('is-missing')) return;
     box.classList.add('is-missing');
-    box.insertAdjacentHTML('beforeend', placeholder(box.classList.contains('tile') ? 'photo' : 'event'));
+    box.insertAdjacentHTML('beforeend', placeholder(box.classList.contains('tile') ? 'photo' : box.closest('.article') ? 'article' : 'event'));
 }, true);
 
 /* Reviews */
@@ -250,10 +257,128 @@ async function loadReviews() {
                 </article>`).join('')
             : '<p class="loading-note">Все още няма публикувани отзиви.</p>';
         observeReveal(box);
+        initCardRow(box, '.review', 'отзиви');
+        clampCards(box, '.review > p');
     } catch (error) {
         console.error(error);
         box.innerHTML = '<p class="loading-note">Отзивите не могат да бъдат заредени в момента.</p>';
     }
+}
+
+/* Long review texts and event descriptions are cut to a few lines; "Прочети още" opens the whole
+   card in a window, so one long text never stretches every card in the row */
+let cardDialog = null;
+
+function openCard(card) {
+    if (!cardDialog) {
+        cardDialog = document.createElement('dialog');
+        cardDialog.className = 'policy-dialog card-dialog';
+        cardDialog.setAttribute('aria-labelledby', 'card-dialog-title');
+        cardDialog.innerHTML = `
+            <div class="policy-head">
+                <div class="card-dialog-head">
+                    <img class="card-dialog-face" alt="" hidden>
+                    <div><div class="card-dialog-meta"></div><h2 id="card-dialog-title"></h2><div class="card-dialog-role"></div></div>
+                </div>
+                <button type="button" class="policy-close" aria-label="Затвори">${ICONS.close}</button>
+            </div>
+            <div class="policy-body" tabindex="-1">
+                <img class="card-dialog-img" alt="" hidden>
+                <p></p>
+                <div class="card-dialog-link"></div>
+            </div>`;
+        document.body.appendChild(cardDialog);
+        const close = () => cardDialog.close();
+        cardDialog.querySelector('.policy-close').addEventListener('click', close);
+        cardDialog.addEventListener('click', (event) => { if (event.target === cardDialog) close(); });
+        cardDialog.addEventListener('close', () => document.body.classList.remove('no-scroll'));
+    }
+    const meta = card.querySelector('.stars, .event-date');
+    const role = card.querySelector('.person-role');
+    cardDialog.querySelector('.card-dialog-role').replaceChildren(...(role ? [role.cloneNode(true)] : []));
+    const face = cardDialog.querySelector('.card-dialog-face');
+    const photo = card.querySelector('.person-photo img');
+    face.hidden = !photo;
+    if (photo) face.src = photo.currentSrc || photo.src;
+    cardDialog.querySelector('.card-dialog-meta').replaceChildren(...(meta ? [meta.cloneNode(true)] : []));
+    cardDialog.querySelector('h2').textContent = card.querySelector('h3').textContent;
+    cardDialog.querySelector('.policy-body p').textContent = card.querySelector('.review > p, .event-body > p, .person-bio').textContent;
+    const img = cardDialog.querySelector('.card-dialog-img');
+    const source = card.querySelector('.event-media img');
+    img.hidden = !source;
+    if (source) img.src = source.currentSrc || source.src;
+    const link = card.querySelector('.event-body > a');
+    cardDialog.querySelector('.card-dialog-link').replaceChildren(...(link ? [link.cloneNode(true)] : []));
+    cardDialog.showModal();
+    document.body.classList.add('no-scroll');
+    const body = cardDialog.querySelector('.policy-body');
+    body.scrollTop = 0;
+    body.focus({ preventScroll: true });
+}
+
+function clampCards(box, textSelector) {
+    const canOpen = typeof HTMLDialogElement === 'function';
+    const check = () => box.querySelectorAll(textSelector).forEach((text) => {
+        let more = text.nextElementSibling?.matches('.card-more') ? text.nextElementSibling : null;
+        if (more?.getAttribute('aria-expanded') === 'true') return;
+        text.classList.add('is-clamped');
+        const long = text.scrollHeight > text.clientHeight + 2;
+        text.classList.toggle('is-clamped', long);
+        if (long && !more) {
+            more = document.createElement('button');
+            more.type = 'button';
+            more.className = 'card-more';
+            more.textContent = 'Прочети още';
+            if (!canOpen) more.setAttribute('aria-expanded', 'false');
+            more.addEventListener('click', () => {
+                if (canOpen) return openCard(text.closest('.review, .event, .person'));
+                const open = more.getAttribute('aria-expanded') !== 'true';
+                more.setAttribute('aria-expanded', String(open));
+                more.textContent = open ? 'Скрий' : 'Прочети още';
+                text.classList.toggle('is-clamped', !open);
+            });
+            text.after(more);
+        } else if (!long && more) {
+            more.remove();
+        }
+    });
+    // Re-check whenever the row changes size: window resize, fonts loading, or a hidden section being shown
+    let timer;
+    const later = () => { clearTimeout(timer); timer = setTimeout(check, 100); };
+    if ('ResizeObserver' in window) new ResizeObserver(later).observe(box);
+    else window.addEventListener('resize', later);
+    check();
+    document.fonts?.ready.then(check);
+}
+
+/* Cards stay on one row; arrows appear only when they do not all fit */
+function initCardRow(box, cardSelector, label) {
+    if (box.parentElement.classList.contains('card-row-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'card-row-wrap';
+    box.before(wrap);
+    wrap.append(box);
+    const nav = document.createElement('div');
+    nav.className = 'card-row-nav';
+    nav.innerHTML = `<button type="button" aria-label="Предишни ${label}">${ICONS.prev}</button><button type="button" aria-label="Следващи ${label}">${ICONS.next}</button>`;
+    wrap.append(nav);
+    const [prev, next] = nav.querySelectorAll('button');
+    const step = () => {
+        const card = box.querySelector(cardSelector);
+        return card ? card.offsetWidth + parseFloat(getComputedStyle(box).columnGap || 0) : box.clientWidth;
+    };
+    const update = () => {
+        const max = box.scrollWidth - box.clientWidth;
+        nav.hidden = max <= 2;
+        prev.disabled = box.scrollLeft <= 2;
+        next.disabled = box.scrollLeft >= max - 2;
+    };
+    prev.addEventListener('click', () => box.scrollBy({ left: -step() }));
+    next.addEventListener('click', () => box.scrollBy({ left: step() }));
+    box.addEventListener('scroll', update, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(update).observe(box);
+    else window.addEventListener('resize', update);
+    update();
 }
 
 /* Team on the About page: shown only when the admin has added people */
@@ -275,6 +400,9 @@ async function loadTeam() {
             </article>`).join('');
         block.hidden = false;
         observeReveal(block);
+        const list = block.querySelector('[data-team-list]');
+        initCardRow(list, '.person', 'хора от екипа');
+        clampCards(list, '.person-bio');
     } catch (error) {
         console.error(error);
     }
@@ -320,11 +448,49 @@ async function loadEvents() {
             const group = section.querySelector(`[data-events-group="${key}"]`);
             if (!group) return;
             group.hidden = !items.length;
-            group.querySelector('.event-row').innerHTML = items.join('');
+            const row = group.querySelector('.event-row');
+            row.innerHTML = items.join('');
+            if (items.length) {
+                initCardRow(row, '.event', 'събития');
+                clampCards(row, '.event-body > p');
+            }
         };
-        fill('upcoming', upcoming);
+        fill('upcoming', upcoming.reverse()); // nearest first (the list comes newest first)
         fill('past', past);
         section.hidden = !(upcoming.length || past.length);
+        observeReveal(section);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+/* Articles on the Academy page: shown only when the admin has added some */
+async function loadArticles() {
+    const section = document.querySelector('[data-articles-section]');
+    if (!section) return;
+    try {
+        const articles = (await fetchContent('articles')).filter((article) => String(article.title || '').trim());
+        if (!articles.length) return;
+        const row = section.querySelector('[data-articles]');
+        row.innerHTML = articles.map((article) => {
+            const title = String(article.title).trim();
+            const link = /^https?:\/\//i.test(article.link || '')
+                ? `<a href="${escapeHtml(article.link)}" target="_blank" rel="noopener">Прочети статията</a>` : '';
+            return `
+                <article class="event article">
+                    <div class="event-media${article.image ? '' : ' is-missing'}">
+                        ${article.image ? `<img src="${escapeHtml(article.image)}" alt="${escapeHtml(title)}" loading="lazy">` : placeholder('article')}
+                    </div>
+                    <div class="event-body">
+                        <h3>${escapeHtml(title)}</h3>
+                        <p>${escapeHtml(String(article.description || '').trim())}</p>
+                        ${link}
+                    </div>
+                </article>`;
+        }).join('');
+        section.hidden = false;
+        initCardRow(row, '.event', 'статии');
+        clampCards(row, '.event-body > p');
         observeReveal(section);
     } catch (error) {
         console.error(error);
@@ -1125,6 +1291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCopy();
     document.querySelectorAll('form[data-form]').forEach(initForm);
     loadReviews();
+    loadArticles();
     loadEvents();
     loadTeam();
     loadGallery();
