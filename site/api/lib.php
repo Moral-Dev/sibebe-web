@@ -6,6 +6,7 @@ declare(strict_types=1);
 const RETENTION_DAYS = 365;          // Form submissions are deleted after one year (privacy policy)
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const UPLOAD_DIR = __DIR__ . '/../uploads';
+// The first categories; after that they are managed in the admin panel (table gallery_categories)
 const GALLERY_CATEGORIES = [
     'workshops' => 'Тематични работилнички',
     'activities' => 'Занимания',
@@ -96,6 +97,72 @@ function connect_db(string $host, string $name, string $user, string $pass): PDO
     return $pdo;
 }
 
+// Team members shown on the About page (added after the first release, so also created on demand)
+const TEAM_TABLE = "CREATE TABLE IF NOT EXISTS team (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            role VARCHAR(160) NOT NULL DEFAULT '',
+            bio TEXT NULL,
+            photo VARCHAR(255) NULL,
+            sort INT NOT NULL DEFAULT 0,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+const GALLERY_CAT_TABLE = "CREATE TABLE IF NOT EXISTS gallery_categories (
+            slug VARCHAR(60) PRIMARY KEY,
+            label VARCHAR(80) NOT NULL,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+/* Gallery categories in display order: [slug => label]. Created and filled with the first ones on demand. */
+function gallery_categories(): array
+{
+    static $cats = null;
+    if ($cats === null) {
+        db()->exec(GALLERY_CAT_TABLE);
+        $rows = db()->query("SELECT slug, label FROM gallery_categories ORDER BY sort, label")->fetchAll(PDO::FETCH_KEY_PAIR);
+        if (!$rows && setting('gallery_categories_seeded') === null) {
+            $stmt = db()->prepare("INSERT INTO gallery_categories (slug, label, sort) VALUES (?, ?, ?)");
+            $i = 0;
+            foreach (GALLERY_CATEGORIES as $slug => $label) {
+                $stmt->execute([$slug, $label, ++$i]);
+            }
+            set_setting('gallery_categories_seeded', '1');
+            $rows = GALLERY_CATEGORIES;
+        }
+        $cats = $rows;
+    }
+    return $cats;
+}
+
+/* "Коледно парти" -> "koledno-parti", unique among the categories */
+function category_slug(string $label): string
+{
+    $map = ['а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ж'=>'zh','з'=>'z','и'=>'i','й'=>'y','к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o','п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f','х'=>'h','ц'=>'ts','ч'=>'ch','ш'=>'sh','щ'=>'sht','ъ'=>'a','ь'=>'y','ю'=>'yu','я'=>'ya'];
+    $slug = strtr(mb_strtolower($label), $map);
+    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $slug), '-') ?: 'kategoria';
+    $slug = rtrim(substr($slug, 0, 24), '-'); // gallery.category holds up to 30 characters, leaving room for -2, -3...
+    $base = $slug;
+    $stmt = db()->prepare("SELECT 1 FROM gallery_categories WHERE slug = ?");
+    for ($n = 2; ; $n++) {
+        $stmt->execute([$slug]);
+        if (!$stmt->fetchColumn()) {
+            return $slug;
+        }
+        $slug = $base . '-' . $n;
+    }
+}
+
+function ensure_team_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(TEAM_TABLE);
+        $done = true;
+    }
+}
+
 function schema(): array
 {
     return [
@@ -158,6 +225,7 @@ function schema(): array
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX (event_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        TEAM_TABLE,
         "CREATE TABLE IF NOT EXISTS settings (
             name VARCHAR(60) PRIMARY KEY,
             value TEXT NOT NULL
@@ -365,7 +433,9 @@ function save_upload(array $file, int $maxSide = 1800): string
         }
     }
     $ext = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'][$info[2]];
-    if (!move_uploaded_file($file['tmp_name'], UPLOAD_DIR . "/{$name}.{$ext}")) {
+    // Files fetched by the server (Google Drive import) are not uploads, so they are moved with rename()
+    $moved = is_uploaded_file($file['tmp_name']) ? move_uploaded_file($file['tmp_name'], UPLOAD_DIR . "/{$name}.{$ext}") : rename($file['tmp_name'], UPLOAD_DIR . "/{$name}.{$ext}");
+    if (!$moved) {
         throw new RuntimeException('Файлът не можа да бъде записан.');
     }
     return "uploads/{$name}.{$ext}";
@@ -630,5 +700,96 @@ function previous_text(string $key)
         return false;
     }
     return $prev === ORIGINAL_TEXT ? null : $prev;
+}
+
+
+/* ---------- Google Drive import for the gallery ---------- */
+// Works with folders and files shared as "Anyone with the link can view"; no Google account or key needed.
+
+function http_fetch(string $url, int $maxBytes = 26214400): array
+{
+    $headers = ['User-Agent: Mozilla/5.0 (compatible; gallery-import)', 'Accept-Language: bg,en;q=0.8'];
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $body = '';
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 5, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 40,
+            CURLOPT_HTTPHEADER => $headers, CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$body, $maxBytes) {
+                $body .= $chunk;
+                return strlen($body) > $maxBytes ? 0 : strlen($chunk);
+            },
+        ]);
+        curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $type = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+        return [$status, $body, $type];
+    }
+    $context = stream_context_create(['http' => ['header' => implode("\r\n", $headers), 'timeout' => 40, 'follow_location' => 1]]);
+    $body = @file_get_contents($url, false, $context, 0, $maxBytes);
+    $type = '';
+    $status = 0;
+    foreach ($http_response_header ?? [] as $line) {
+        if (preg_match('#^HTTP/\S+ (\d+)#', $line, $m)) {
+            $status = (int) $m[1];
+        } elseif (stripos($line, 'Content-Type:') === 0) {
+            $type = trim(substr($line, 13));
+        }
+    }
+    return [$status, (string) $body, $type];
+}
+
+/* Folder and file ids from pasted Google Drive links. */
+function drive_ids(string $text): array
+{
+    preg_match_all('#/folders/([\w-]{10,})#', $text, $folders);
+    preg_match_all('#(?:/file/d/|[?&]id=)([\w-]{10,})#', $text, $files);
+    return ['folders' => array_values(array_unique($folders[1])), 'files' => array_values(array_unique($files[1]))];
+}
+
+/* The photos in a shared folder: [['id' => ..., 'name' => ...], ...] */
+function drive_folder_files(string $folderId): array
+{
+    [$status, $html] = http_fetch('https://drive.google.com/embeddedfolderview?id=' . rawurlencode($folderId), 5000000);
+    if ($status !== 200 || !str_contains($html, 'flip-entry')) {
+        throw new RuntimeException('Папката не може да бъде отворена. Проверете, че е споделена като „Всеки с линка“.');
+    }
+    $files = [];
+    preg_match_all('#<div class="flip-entry" id="entry-([\w-]+)"[\s\S]*?<a href="([^"]*)"[\s\S]*?<div class="flip-entry-title">([^<]*)</div>#', $html, $m, PREG_SET_ORDER);
+    foreach ($m as $entry) {
+        if (str_contains($entry[2], '/folders/')) {
+            continue; // subfolders are not opened
+        }
+        $files[] = ['id' => $entry[1], 'name' => html_entity_decode($entry[3], ENT_QUOTES, 'UTF-8')];
+    }
+    return $files;
+}
+
+/* Downloads one shared Drive photo and stores it like an upload. Returns the uploads/... path. */
+function import_drive_photo(string $fileId): string
+{
+    if (!preg_match('/^[\w-]{10,}$/', $fileId)) {
+        throw new RuntimeException('Невалиден линк.');
+    }
+    @set_time_limit(120);
+    $body = '';
+    foreach (['https://drive.usercontent.google.com/download?export=download&id=', 'https://drive.google.com/uc?export=download&id='] as $base) {
+        [$status, $body, $type] = http_fetch($base . rawurlencode($fileId));
+        if ($status === 200 && str_starts_with(strtolower($type), 'image/')) {
+            break;
+        }
+        $body = '';
+    }
+    if ($body === '') {
+        throw new RuntimeException('Снимката не може да бъде изтеглена (може да не е споделена или да не е снимка).');
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'drv');
+    file_put_contents($tmp, $body);
+    try {
+        return save_upload(['name' => $fileId, 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => strlen($body)]);
+    } finally {
+        @unlink($tmp);
+    }
 }
 

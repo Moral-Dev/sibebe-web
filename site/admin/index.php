@@ -41,9 +41,9 @@ function take_flash_error(): string
     unset($_SESSION['flash']);
     return $flash ? $flash[1] : '';
 }
-function go(string $page, array $query = []): void
+function go(string $page, array $query = [], string $anchor = ''): void
 {
-    header('Location: ?' . http_build_query(['p' => $page] + $query));
+    header('Location: ?' . http_build_query(['p' => $page] + $query) . ($anchor !== '' ? '#' . $anchor : ''));
     exit;
 }
 function fmt_date(?string $value, bool $time = true): string
@@ -282,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'upload_gallery':
                 $files = $_FILES['photos'] ?? null;
-                $category = array_key_exists($_POST['category'] ?? '', GALLERY_CATEGORIES) ? $_POST['category'] : '';
+                $category = array_key_exists($_POST['category'] ?? '', gallery_categories()) ? $_POST['category'] : '';
                 $alt = clean($_POST['alt'] ?? '', 190) ?: 'Снимка от Sí bebé';
                 $count = 0;
                 $failed = [];
@@ -297,18 +297,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 flash($count ? "Качени снимки: {$count}." . ($failed ? ' Неуспешни: ' . implode('; ', $failed) : '') : 'Няма качени снимки. ' . implode('; ', $failed), $count ? 'ok' : 'error');
                 go('gallery');
+            case 'cat_add':
+                $label = clean($_POST['label'] ?? '', 80);
+                if ($label === '') {
+                    throw new RuntimeException('Въведете име на категорията.');
+                }
+                if (in_array(mb_strtolower($label), array_map('mb_strtolower', gallery_categories()), true)) {
+                    throw new RuntimeException('Вече има категория „' . $label . '“.');
+                }
+                $sort = (int) $pdo->query("SELECT COALESCE(MAX(sort), 0) + 1 FROM gallery_categories")->fetchColumn();
+                $pdo->prepare("INSERT INTO gallery_categories (slug, label, sort) VALUES (?, ?, ?)")->execute([category_slug($label), $label, $sort]);
+                flash('Добавена е категория „' . $label . '“.');
+                go('gallery', [], 'cats');
+            case 'cat_rename':
+                $label = clean($_POST['label'] ?? '', 80);
+                $slug = (string) ($_POST['slug'] ?? '');
+                if ($label === '' || !isset(gallery_categories()[$slug])) {
+                    throw new RuntimeException('Въведете име на категорията.');
+                }
+                $pdo->prepare("UPDATE gallery_categories SET label = ? WHERE slug = ?")->execute([$label, $slug]);
+                flash('Категорията е преименувана на „' . $label . '“.');
+                go('gallery', [], 'cats');
+            case 'cat_delete':
+                $slug = (string) ($_POST['slug'] ?? '');
+                $label = gallery_categories()[$slug] ?? '';
+                $pdo->prepare("UPDATE gallery SET category = '' WHERE category = ?")->execute([$slug]);
+                $pdo->prepare("DELETE FROM gallery_categories WHERE slug = ?")->execute([$slug]);
+                flash('Категорията „' . $label . '“ е изтрита. Снимките ѝ остават в галерията без категория.');
+                go('gallery', [], 'cats');
+            case 'cat_move':
+                $slugs = array_keys(gallery_categories());
+                $pos = array_search((string) ($_POST['slug'] ?? ''), $slugs, true);
+                $to = $pos === false ? false : $pos + (($_POST['dir'] ?? '') === 'up' ? -1 : 1);
+                if ($pos !== false && isset($slugs[$to])) {
+                    [$slugs[$pos], $slugs[$to]] = [$slugs[$to], $slugs[$pos]];
+                }
+                $stmt = $pdo->prepare("UPDATE gallery_categories SET sort = ? WHERE slug = ?");
+                foreach ($slugs as $i => $slug) {
+                    $stmt->execute([$i + 1, $slug]);
+                }
+                go('gallery', [], 'cats');
             case 'update_photo':
-                $category = array_key_exists($_POST['category'] ?? '', GALLERY_CATEGORIES) ? $_POST['category'] : '';
+                $category = array_key_exists($_POST['category'] ?? '', gallery_categories()) ? $_POST['category'] : '';
                 $pdo->prepare("UPDATE gallery SET alt = ?, category = ? WHERE id = ?")->execute([clean($_POST['alt'] ?? '', 190), $category, $id]);
                 flash('Снимката е обновена.');
-                go('gallery');
+                go('gallery', gallery_filter_query());
             case 'delete_photo':
-                $stmt = $pdo->prepare("SELECT file FROM gallery WHERE id = ?");
-                $stmt->execute([$id]);
-                delete_upload($stmt->fetchColumn() ?: null);
-                $pdo->prepare("DELETE FROM gallery WHERE id = ?")->execute([$id]);
+                delete_gallery_photos($pdo, [$id]);
                 flash('Снимката е изтрита.');
-                go('gallery');
+                go('gallery', gallery_filter_query());
+            case 'bulk_photos':
+                $ids = array_values(array_filter(array_map('intval', (array) ($_POST['ids'] ?? []))));
+                if (!$ids) {
+                    throw new RuntimeException('Не сте избрали снимки.');
+                }
+                if (($_POST['op'] ?? '') === 'delete') {
+                    delete_gallery_photos($pdo, $ids);
+                    flash('Изтрити снимки: ' . count($ids) . '.');
+                } else {
+                    $category = (string) ($_POST['category'] ?? '');
+                    if ($category !== '' && !isset(gallery_categories()[$category])) {
+                        throw new RuntimeException('Изберете категория.');
+                    }
+                    $marks = implode(',', array_fill(0, count($ids), '?'));
+                    $pdo->prepare("UPDATE gallery SET category = ? WHERE id IN ({$marks})")->execute(array_merge([$category], $ids));
+                    flash('Преместени снимки: ' . count($ids) . ' → ' . ($category === '' ? 'Без категория' : gallery_categories()[$category]) . '.');
+                }
+                go('gallery', gallery_filter_query());
 
             case 'save_event':
                 $title = clean($_POST['title'] ?? '', 190);
@@ -345,6 +400,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("DELETE FROM events WHERE id = ?")->execute([$id]);
                 flash('Събитието е изтрито.');
                 go('events');
+
+            case 'save_team':
+                ensure_team_table();
+                $name = clean($_POST['name'] ?? '', 120);
+                $role = clean($_POST['role'] ?? '', 160);
+                $bio = clean_text($_POST['bio'] ?? '', 3000);
+                $visible = isset($_POST['visible']) ? 1 : 0;
+                if ($name === '') {
+                    throw new RuntimeException('Въведете име.');
+                }
+                $photo = !empty($_FILES['photo']['name']) ? save_upload($_FILES['photo'], 900) : null;
+                if ($id) {
+                    if ($photo) {
+                        $stmt = $pdo->prepare("SELECT photo FROM team WHERE id = ?");
+                        $stmt->execute([$id]);
+                        delete_upload($stmt->fetchColumn() ?: null);
+                        $pdo->prepare("UPDATE team SET photo = ? WHERE id = ?")->execute([$photo, $id]);
+                    } elseif (isset($_POST['remove_photo'])) {
+                        $stmt = $pdo->prepare("SELECT photo FROM team WHERE id = ?");
+                        $stmt->execute([$id]);
+                        delete_upload($stmt->fetchColumn() ?: null);
+                        $pdo->prepare("UPDATE team SET photo = NULL WHERE id = ?")->execute([$id]);
+                    }
+                    $pdo->prepare("UPDATE team SET name = ?, role = ?, bio = ?, visible = ? WHERE id = ?")->execute([$name, $role, $bio, $visible, $id]);
+                } else {
+                    $sort = (int) $pdo->query("SELECT COALESCE(MAX(sort), 0) + 1 FROM team")->fetchColumn();
+                    $pdo->prepare("INSERT INTO team (name, role, bio, photo, sort, visible) VALUES (?, ?, ?, ?, ?, ?)")->execute([$name, $role, $bio, $photo, $sort, $visible]);
+                }
+                flash('Запазено: ' . $name . '.');
+                go('team');
+            case 'delete_team':
+                ensure_team_table();
+                $stmt = $pdo->prepare("SELECT photo FROM team WHERE id = ?");
+                $stmt->execute([$id]);
+                delete_upload($stmt->fetchColumn() ?: null);
+                $pdo->prepare("DELETE FROM team WHERE id = ?")->execute([$id]);
+                flash('Човекът е премахнат от екипа.');
+                go('team');
+            case 'move_team':
+                ensure_team_table();
+                // Renumber in the current order, then swap with the neighbour
+                $ids = $pdo->query("SELECT id FROM team ORDER BY sort, id")->fetchAll(PDO::FETCH_COLUMN);
+                $pos = array_search($id, array_map('intval', $ids), true);
+                $to = $pos === false ? false : $pos + (($_POST['dir'] ?? '') === 'up' ? -1 : 1);
+                if ($pos !== false && isset($ids[$to])) {
+                    [$ids[$pos], $ids[$to]] = [$ids[$to], $ids[$pos]];
+                }
+                $stmt = $pdo->prepare("UPDATE team SET sort = ? WHERE id = ?");
+                foreach ($ids as $i => $teamId) {
+                    $stmt->execute([$i + 1, $teamId]);
+                }
+                go('team');
 
             case 'slot':
                 $slot = (string) ($_POST['slot'] ?? '');
@@ -439,6 +546,7 @@ $nav = [
     'reviews' => ['Отзиви', 'star'],
     'gallery' => ['Галерия', 'photo'],
     'events' => ['Събития', 'event'],
+    'team' => ['Екип', 'users'],
     'images' => ['Снимки в сайта', 'image'],
     'account' => ['Профил и настройки', 'key'],
 ];
@@ -473,6 +581,7 @@ render_head($nav[$page][0]);
             case 'reviews': page_reviews($pdo); break;
             case 'gallery': page_gallery($pdo); break;
             case 'events': page_events($pdo); break;
+            case 'team': page_team($pdo); break;
             case 'images': page_images(); break;
             case 'account': page_account($pdo); break;
         }
@@ -615,10 +724,31 @@ function page_reviews(PDO $pdo): void
     <?php
 }
 
+/* Keeps the chosen category filter after an action on the gallery page */
+function gallery_filter_query(): array
+{
+    $cat = (string) ($_POST['cat'] ?? '');
+    return preg_match('/^[a-z0-9-]{1,30}$/', $cat) ? ['cat' => $cat] : [];
+}
+
+/* Deletes photos with their files; a photo deleted this way can be imported from Google Drive again */
+function delete_gallery_photos(PDO $pdo, array $ids): void
+{
+    $marks = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare("SELECT file FROM gallery WHERE id IN ({$marks})");
+    $stmt->execute($ids);
+    $forget = $pdo->prepare("DELETE FROM settings WHERE name LIKE 'drive:%' AND value = ?");
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $file) {
+        delete_upload($file);
+        $forget->execute([$file]);
+    }
+    $pdo->prepare("DELETE FROM gallery WHERE id IN ({$marks})")->execute($ids);
+}
+
 function category_options(string $selected = ''): string
 {
     $html = '<option value="">Без категория</option>';
-    foreach (GALLERY_CATEGORIES as $key => $label) {
+    foreach (gallery_categories() as $key => $label) {
         $html .= '<option value="' . $key . '"' . ($key === $selected ? ' selected' : '') . '>' . h($label) . '</option>';
     }
     return $html;
@@ -626,7 +756,21 @@ function category_options(string $selected = ''): string
 
 function page_gallery(PDO $pdo): void
 {
-    $rows = $pdo->query("SELECT * FROM gallery ORDER BY created_at DESC, id DESC")->fetchAll();
+    // Filter: all, one category, or photos without a category ("none")
+    $filter = (string) ($_GET['cat'] ?? 'all');
+    $allCats = gallery_categories();
+    if ($filter !== 'all' && $filter !== 'none' && !isset($allCats[$filter])) {
+        $filter = 'all';
+    }
+    if ($filter === 'all') {
+        $rows = $pdo->query("SELECT * FROM gallery ORDER BY created_at DESC, id DESC")->fetchAll();
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM gallery WHERE category = ? ORDER BY created_at DESC, id DESC");
+        $stmt->execute([$filter === 'none' ? '' : $filter]);
+        $rows = $stmt->fetchAll();
+    }
+    $byCat = $pdo->query("SELECT category, COUNT(*) FROM gallery GROUP BY category")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $total = array_sum($byCat);
     ?>
     <header class="page-head"><h1>Галерия</h1></header>
     <section class="panel">
@@ -639,18 +783,133 @@ function page_gallery(PDO $pdo): void
             <div class="form-actions span-2"><button class="btn" type="submit">Качи</button></div>
         </form>
     </section>
+    <?php
+    $cats = gallery_categories();
+    $counts = $pdo->query("SELECT category, COUNT(*) FROM gallery GROUP BY category")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $slugs = array_keys($cats);
+    ?>
+    <section class="panel" id="cats">
+        <h2>Категории</h2>
+        <p class="muted">Категориите са бутоните за филтриране в галерията на сайта. На сайта се показват само тези, в които има снимки.</p>
+        <div class="cat-list">
+            <?php foreach ($cats as $slug => $label): $i = array_search($slug, $slugs, true); ?>
+                <div class="cat-row">
+                    <form method="post" class="cat-rename"><?= csrf_field() ?><input type="hidden" name="action" value="cat_rename"><input type="hidden" name="slug" value="<?= h($slug) ?>">
+                        <input name="label" value="<?= h($label) ?>" aria-label="Име на категорията" required>
+                        <button class="btn btn--small btn--ghost" type="submit">Преименувай</button>
+                    </form>
+                    <?php $n = (int) ($counts[$slug] ?? 0); ?><span class="cat-count"><?= $n ?> <?= $n === 1 ? 'снимка' : 'снимки' ?></span>
+                    <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="cat_move"><input type="hidden" name="dir" value="up"><input type="hidden" name="slug" value="<?= h($slug) ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-напред"<?= $i === 0 ? ' disabled' : '' ?>>↑</button></form>
+                    <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="cat_move"><input type="hidden" name="dir" value="down"><input type="hidden" name="slug" value="<?= h($slug) ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-назад"<?= $i === count($slugs) - 1 ? ' disabled' : '' ?>>↓</button></form>
+                    <form method="post" data-confirm="Да изтрия ли категорията „<?= h($label) ?>“? Снимките ѝ остават без категория."><?= csrf_field() ?><input type="hidden" name="action" value="cat_delete"><input type="hidden" name="slug" value="<?= h($slug) ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                </div>
+            <?php endforeach; ?>
+            <?php if (!$cats): ?><p class="muted">Няма категории. Снимките се показват само под „Всички“.</p><?php endif; ?>
+        </div>
+        <form method="post" class="cat-add"><?= csrf_field() ?><input type="hidden" name="action" value="cat_add">
+            <input name="label" placeholder="Нова категория, напр. Рождени дни" aria-label="Нова категория" required>
+            <button class="btn btn--small" type="submit">Добави</button>
+        </form>
+    </section>
+    <section class="panel">
+        <h2>Внеси от Google Drive</h2>
+        <p class="muted">В Google Drive натиснете <strong>Споделяне</strong> на папката и изберете <strong>„Всеки с линка“</strong>. После поставете линка тук. Снимките се изтеглят и записват в сайта; ако внесете същата папка пак, се добавят само новите.</p>
+        <form class="form-grid" data-drive data-csrf="<?= h(csrf()) ?>">
+            <label class="span-2">Линк към папка (или снимки) в Google Drive<input name="link" required placeholder="https://drive.google.com/drive/folders/..."></label>
+            <label>Категория<select name="category"><?= category_options() ?></select></label>
+            <label>Описание (за незрящи и Google)<input name="alt" placeholder="напр. Коледно парти 2026"></label>
+            <div class="form-actions span-2"><button class="btn" type="submit">Внеси снимките</button></div>
+            <div class="drive-progress span-2" hidden><div class="drive-bar"><span></span></div><p class="drive-status"></p></div>
+        </form>
+    </section>
     <p class="muted small">Снимките се смаляват автоматично и се изчиства информацията от фотоапарата (напр. местоположение).</p>
+    <nav class="gal-filter" aria-label="Филтър по категория">
+        <a href="?p=gallery" class="<?= $filter === 'all' ? 'is-on' : '' ?>">Всички <b><?= $total ?></b></a>
+        <?php foreach ($allCats as $slug => $label): ?>
+            <a href="?p=gallery&amp;cat=<?= h($slug) ?>" class="<?= $filter === $slug ? 'is-on' : '' ?>"><?= h($label) ?> <b><?= (int) ($byCat[$slug] ?? 0) ?></b></a>
+        <?php endforeach; ?>
+        <?php if (!empty($byCat[''])): ?><a href="?p=gallery&amp;cat=none" class="<?= $filter === 'none' ? 'is-on' : '' ?>">Без категория <b><?= (int) $byCat[''] ?></b></a><?php endif; ?>
+    </nav>
+    <?php if ($rows): ?>
+    <form method="post" id="bulk" class="bulk-bar" data-bulk>
+        <?= csrf_field() ?><input type="hidden" name="action" value="bulk_photos"><input type="hidden" name="cat" value="<?= h($filter) ?>">
+        <label class="check bulk-all"><input type="checkbox" data-bulk-all> Избери всички (<?= count($rows) ?>)</label>
+        <span class="bulk-count" data-bulk-count>Няма избрани</span>
+        <span class="bulk-actions">
+            <select name="category" aria-label="Премести в категория"><?= category_options() ?></select>
+            <button class="btn btn--small" type="submit" name="op" value="move" data-bulk-need>Премести</button>
+            <button class="btn btn--small btn--danger" type="submit" name="op" value="delete" data-bulk-need>Изтрий избраните</button>
+        </span>
+    </form>
+    <?php else: ?>
+        <p class="muted">Няма снимки в тази категория.</p>
+    <?php endif; ?>
     <div class="photo-grid">
         <?php foreach ($rows as $r): ?>
             <figure class="photo">
+                <label class="photo-pick" title="Избери"><input type="checkbox" name="ids[]" value="<?= $r['id'] ?>" form="bulk" aria-label="Избери снимката"></label>
                 <img src="../<?= h($r['file']) ?>" alt="<?= h($r['alt']) ?>" loading="lazy">
-                <form method="post" class="photo-edit"><?= csrf_field() ?><input type="hidden" name="action" value="update_photo"><input type="hidden" name="id" value="<?= $r['id'] ?>">
+                <form method="post" class="photo-edit"><?= csrf_field() ?><input type="hidden" name="action" value="update_photo"><input type="hidden" name="id" value="<?= $r['id'] ?>"><input type="hidden" name="cat" value="<?= h($filter) ?>">
                     <select name="category"><?= category_options($r['category']) ?></select>
                     <input name="alt" value="<?= h($r['alt']) ?>" aria-label="Описание">
                     <button class="btn btn--small btn--ghost" type="submit">Запази</button>
                 </form>
-                <form method="post" data-confirm="Да изтрия ли снимката?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_photo"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                <form method="post" data-confirm="Да изтрия ли снимката?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_photo"><input type="hidden" name="id" value="<?= $r['id'] ?>"><input type="hidden" name="cat" value="<?= h($filter) ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
             </figure>
+        <?php endforeach; ?>
+    </div>
+    <?php
+}
+
+function page_team(PDO $pdo): void
+{
+    ensure_team_table();
+    $edit = null;
+    if (!empty($_GET['edit'])) {
+        $stmt = $pdo->prepare("SELECT * FROM team WHERE id = ?");
+        $stmt->execute([(int) $_GET['edit']]);
+        $edit = $stmt->fetch() ?: null;
+    }
+    $rows = $pdo->query("SELECT * FROM team ORDER BY sort, id")->fetchAll();
+    ?>
+    <header class="page-head"><h1>Екип</h1></header>
+    <p class="muted">Хората от екипа се показват на страница „За нас“, в секцията „Екип“, в реда от тази страница.</p>
+    <section class="panel">
+        <h2><?= $edit ? 'Редакция: ' . h($edit['name']) : 'Нов член на екипа' ?></h2>
+        <form method="post" enctype="multipart/form-data" class="form-grid">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_team"><input type="hidden" name="id" value="<?= $edit['id'] ?? '' ?>">
+            <label>Име<input name="name" value="<?= h($edit['name'] ?? '') ?>" required placeholder="напр. д-р Мария Иванова"></label>
+            <label>Длъжност<input name="role" value="<?= h($edit['role'] ?? '') ?>" placeholder="напр. Детски психолог"></label>
+            <label class="span-2">Биография<textarea name="bio" rows="5" placeholder="Няколко изречения за опита и подхода"><?= h($edit['bio'] ?? '') ?></textarea></label>
+            <label>Снимка<?= $edit && $edit['photo'] ? ' (оставете празно, за да запазите сегашната)' : '' ?><input type="file" name="photo" accept="image/jpeg,image/png,image/webp"></label>
+            <div class="team-form-side">
+                <?php if ($edit && $edit['photo']): ?>
+                    <div class="team-current"><img src="../<?= h($edit['photo']) ?>" alt=""><label class="check"><input type="checkbox" name="remove_photo"> Махни снимката</label></div>
+                <?php endif; ?>
+                <label class="check"><input type="checkbox" name="visible"<?= ($edit['visible'] ?? 1) ? ' checked' : '' ?>> Показвай на сайта</label>
+            </div>
+            <div class="form-actions span-2"><button class="btn" type="submit">Запази</button><?php if ($edit): ?><a class="btn btn--ghost" href="?p=team">Откажи</a><?php endif; ?></div>
+        </form>
+    </section>
+    <?php if (!$rows): ?>
+        <p class="muted">Все още няма добавени хора. Докато няма, на сайта не се показва нищо ново.</p>
+    <?php endif; ?>
+    <div class="team-list">
+        <?php foreach ($rows as $i => $r): ?>
+            <article class="team-card<?= $r['visible'] ? '' : ' card--muted' ?>">
+                <div class="team-photo"><?php if ($r['photo']): ?><img src="../<?= h($r['photo']) ?>" alt=""><?php else: ?><span><?= h(mb_strtoupper(mb_substr($r['name'], 0, 1))) ?></span><?php endif; ?></div>
+                <div class="team-body">
+                    <h3><?= h($r['name']) ?><?= $r['visible'] ? '' : ' <span class="pill">скрит</span>' ?></h3>
+                    <?php if ($r['role']): ?><p class="team-role"><?= h($r['role']) ?></p><?php endif; ?>
+                    <?php if ($r['bio']): ?><p class="team-bio"><?= nl2br(h($r['bio'])) ?></p><?php endif; ?>
+                    <div class="card-actions">
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_team"><input type="hidden" name="dir" value="up"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-напред"<?= $i === 0 ? ' disabled' : '' ?>>↑</button></form>
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_team"><input type="hidden" name="dir" value="down"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-назад"<?= $i === count($rows) - 1 ? ' disabled' : '' ?>>↓</button></form>
+                        <a class="btn btn--small btn--ghost" href="?p=team&amp;edit=<?= $r['id'] ?>">Редактирай</a>
+                        <form method="post" data-confirm="Да премахна ли <?= h($r['name']) ?> от екипа?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_team"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                    </div>
+                </div>
+            </article>
         <?php endforeach; ?>
     </div>
     <?php

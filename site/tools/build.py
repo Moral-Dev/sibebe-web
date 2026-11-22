@@ -559,6 +559,12 @@ def build_about():
                 <div class="card-grid card-grid--3">
 {team_html}
                 </div>
+                <div class="team-people" data-team hidden>
+                    <div class="section-head" style="margin-top: 72px;">
+                        <h2>Запознайте се с екипа</h2>
+                    </div>
+                    <div class="people" data-team-list></div>
+                </div>
                 <blockquote class="philosophy" style="margin-top: 80px;">
                     <h3>Нашата обща философия</h3>
                     <p>Ние не сме просто служители, а партньори на семейството. Тук ще откриете хора, които изслушват, съветват и обгръщат детето ви със среда, в която то се чувства сигурно, разбрано и обичано.</p>
@@ -840,13 +846,13 @@ def build_partners():
 
 
 def build_gallery():
-    filters = [('all', 'Всички'), ('workshops', 'Тематични работилнички'), ('activities', 'Занимания'), ('events', 'Събития'), ('interior', 'Интериор')]
-    f_html = '\n'.join(f'                    <button type="button" class="filter" data-filter="{k}" aria-pressed="{"true" if k == "all" else "false"}">{t}</button>' for k, t in filters)
+    # Only "Всички" is fixed; the categories are managed in the admin panel and added by site.js
+    f_html = '                    <button type="button" class="filter" data-filter="all" aria-pressed="true">Всички</button>'
     body = f'''{intro('Галерия', 'gallery-intro', 'Деца играят с дървени играчки в светла занималня', subtitle='Разгледайте магията в снимки')}
 
         <section class="section section--white">
             <div class="container">
-                <div class="filters" role="group" aria-label="Категории снимки">
+                <div class="filters" role="group" aria-label="Категории снимки" data-gallery-filters>
 {f_html}
                 </div>
                 <div class="mosaic" data-gallery><p class="loading-note">Зареждане...</p></div>

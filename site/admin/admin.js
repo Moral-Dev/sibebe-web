@@ -344,6 +344,110 @@
         write();
     });
 
+    /* ---------- Google Drive import (gallery): one photo per request, with a progress bar ---------- */
+    document.querySelectorAll('form[data-drive]').forEach(function (form) {
+        var progress = form.querySelector('.drive-progress');
+        var bar = progress.querySelector('.drive-bar span');
+        var status = progress.querySelector('.drive-status');
+        var button = form.querySelector('[type="submit"]');
+        var post = function (data) {
+            data.append('csrf', form.dataset.csrf);
+            return fetch('drive.php', { method: 'POST', body: data, headers: { Accept: 'application/json' } })
+                .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Сървърът не отговори.' }; }); });
+        };
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (form.dataset.confirmed) return;
+            var link = form.link.value.trim();
+            if (!link) return;
+            button.disabled = true;
+            progress.hidden = false;
+            bar.style.width = '4%';
+            status.textContent = 'Търся снимките в папката…';
+            var list = new FormData();
+            list.append('action', 'list');
+            list.append('link', link);
+            post(list).then(function (res) {
+                if (!res.ok) throw new Error(res.error);
+                var photos = res.photos;
+                var note = (res.already ? ' Вече внесени (пропуснати): ' + res.already + '.' : '') + (res.skipped.length ? ' Файлове, които не са снимки JPG/PNG/WEBP: ' + res.skipped.length + '.' : '');
+                if (!photos.length) {
+                    status.textContent = 'Няма нови снимки за внасяне.' + note;
+                    bar.style.width = '100%';
+                    button.disabled = false;
+                    return;
+                }
+                var done = 0, failed = 0, i = 0;
+                var next = function () {
+                    if (i >= photos.length) {
+                        status.textContent = 'Готово: внесени ' + done + (failed ? ', неуспешни ' + failed : '') + '.' + note;
+                        setTimeout(function () { location.href = '?p=gallery'; }, 1400);
+                        return;
+                    }
+                    var photo = photos[i++];
+                    status.textContent = 'Внасям ' + i + ' от ' + photos.length + ': ' + photo.name;
+                    var one = new FormData();
+                    one.append('action', 'import');
+                    one.append('id', photo.id);
+                    one.append('category', form.category.value);
+                    one.append('alt', form.alt.value);
+                    post(one).then(function (r) { if (r.ok) done++; else failed++; })
+                        .catch(function () { failed++; })
+                        .then(function () { bar.style.width = Math.round(i / photos.length * 100) + '%'; next(); });
+                };
+                next();
+            }).catch(function (err) {
+                status.textContent = '';
+                progress.hidden = true;
+                button.disabled = false;
+                sayError(err.message || 'Възникна грешка.');
+            });
+        });
+    });
+
+    /* ---------- Gallery: select several photos, then move or delete them together ---------- */
+    document.querySelectorAll('form[data-bulk]').forEach(function (form) {
+        var boxes = function () { return document.querySelectorAll('input[form="' + form.id + '"][name="ids[]"]'); };
+        var all = form.querySelector('[data-bulk-all]');
+        var count = form.querySelector('[data-bulk-count]');
+        var update = function () {
+            var list = boxes();
+            var n = Array.prototype.filter.call(list, function (b) { return b.checked; }).length;
+            count.textContent = n ? 'Избрани: ' + n : 'Няма избрани';
+            form.classList.toggle('has-selection', n > 0);
+            form.querySelectorAll('[data-bulk-need]').forEach(function (btn) { btn.disabled = n === 0; });
+            all.checked = n > 0 && n === list.length;
+            all.indeterminate = n > 0 && n < list.length;
+            list.forEach(function (b) { b.closest('.photo').classList.toggle('is-picked', b.checked); });
+        };
+        all.addEventListener('change', function () {
+            boxes().forEach(function (b) { b.checked = all.checked; });
+            update();
+        });
+        document.addEventListener('change', function (e) { if (e.target.matches && e.target.matches('input[form="' + form.id + '"]')) update(); });
+        // Click on the photo itself also selects it
+        document.querySelectorAll('.photo img').forEach(function (img) {
+            img.addEventListener('click', function () {
+                var box = img.closest('.photo').querySelector('.photo-pick input');
+                box.checked = !box.checked;
+                update();
+            });
+        });
+        form.addEventListener('submit', function (e) {
+            if (form.dataset.confirmed) return;
+            var op = e.submitter && e.submitter.value;
+            var n = Array.prototype.filter.call(boxes(), function (b) { return b.checked; }).length;
+            if (op !== 'delete') return;
+            e.preventDefault();
+            ask('Да изтрия ли ' + n + (n === 1 ? ' снимка' : ' снимки') + '? Това не може да се върне.', true).then(function (yes) {
+                if (!yes) return;
+                form.dataset.confirmed = '1';
+                form.requestSubmit(e.submitter);
+            });
+        });
+        update();
+    });
+
     /* ---------- Forms: own messages instead of the browser bubbles, own confirm dialog ---------- */
     document.querySelectorAll('form').forEach(function (form) { form.noValidate = true; });
     var fieldName = function (node) {
@@ -353,7 +457,8 @@
     };
     document.addEventListener('submit', function (e) {
         var form = e.target;
-        if (form.dataset.confirmed) return;
+        if (form.dataset.confirmed || form.hasAttribute('data-drive')) return;
+        if (form.hasAttribute('data-bulk')) return;
         var problems = [];
         form.querySelectorAll('[required]').forEach(function (field) {
             var empty = field.type === 'file' ? !field.files.length : !String(field.value).trim();

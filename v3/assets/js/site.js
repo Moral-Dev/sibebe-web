@@ -256,6 +256,30 @@ async function loadReviews() {
     }
 }
 
+/* Team on the About page: shown only when the admin has added people */
+async function loadTeam() {
+    const block = document.querySelector('[data-team]');
+    if (!block) return;
+    try {
+        const people = (await fetchContent('team')).filter((person) => person.name);
+        if (!people.length) return;
+        const initial = (name) => escapeHtml(name.trim().charAt(0).toUpperCase());
+        block.querySelector('[data-team-list]').innerHTML = people.map((person) => `
+            <article class="person">
+                <div class="person-photo">${person.photo
+                    ? `<img src="${escapeHtml(person.photo)}" alt="${escapeHtml(person.name)}" loading="lazy" width="320" height="320">`
+                    : `<span aria-hidden="true">${initial(person.name)}</span>`}</div>
+                <h3>${escapeHtml(person.name)}</h3>
+                ${person.role ? `<p class="person-role">${escapeHtml(person.role)}</p>` : ''}
+                ${person.bio ? `<p class="person-bio">${escapeHtml(person.bio)}</p>` : ''}
+            </article>`).join('');
+        block.hidden = false;
+        observeReveal(block);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 /* Events */
 const formatDate = (date) => {
     const time = date.getHours() || date.getMinutes()
@@ -327,7 +351,16 @@ async function loadGallery() {
     };
 
     try {
-        items = (await fetchContent('gallery')).map((item) => ({
+        // Categories come from the admin panel; only those with photos get a button
+        const [photos, categories] = await Promise.all([fetchContent('gallery'), fetchContent('categories').catch(() => [])]);
+        const used = new Set(photos.map((item) => item.category).filter(Boolean));
+        const filters = document.querySelector('[data-gallery-filters]');
+        if (filters) {
+            filters.insertAdjacentHTML('beforeend', categories.filter((cat) => used.has(cat.key)).map((cat) =>
+                `<button type="button" class="filter" data-filter="${escapeHtml(cat.key)}" aria-pressed="false">${escapeHtml(cat.label)}</button>`).join(''));
+            filters.hidden = filters.querySelectorAll('[data-filter]').length < 2;
+        }
+        items = photos.map((item) => ({
             url: String(item.url || '').trim(),
             alt: String(item.alt || 'Снимка от Sí bebé').trim(),
             category: item.category || '',
@@ -1093,6 +1126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form[data-form]').forEach(initForm);
     loadReviews();
     loadEvents();
+    loadTeam();
     loadGallery();
     initEditor();
     initPrivacyDialog();

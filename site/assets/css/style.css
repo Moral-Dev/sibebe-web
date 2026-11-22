@@ -329,6 +329,26 @@ main { position: relative; }
 .star-group i { position: absolute; width: var(--z, 3px); height: var(--z, 3px); border-radius: 50%; background: #fff; }
 @keyframes twinkle { from { opacity: .25; } to { opacity: .9; } }
 
+/* Text typed in the admin panel: a very long word wraps instead of running out of its card */
+.person, .review, .event-body, .tile figcaption { overflow-wrap: anywhere; min-width: 0; }
+
+/* ---------- Team on the About page ---------- */
+.people { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 320px)); justify-content: center; gap: 26px; }
+.person {
+    padding: 28px 24px 26px; border-radius: var(--radius); background: var(--white); text-align: center;
+    box-shadow: var(--shadow-sm); transition: transform .4s var(--ease), box-shadow .4s var(--ease);
+}
+.person:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
+.person-photo {
+    width: 150px; height: 150px; margin: 0 auto 18px; overflow: hidden; display: grid; place-items: center;
+    border-radius: 58% 42% 52% 48% / 46% 52% 48% 54%; background: var(--lavender); box-shadow: 0 0 0 6px var(--mint);
+}
+.person-photo img { width: 100%; height: 100%; object-fit: cover; }
+.person-photo span { font: 900 3rem var(--font-head); color: var(--plum); }
+.person h3 { margin-bottom: 4px; }
+.person-role { margin: 0 0 12px; color: var(--plum); font-family: var(--font-head); font-weight: 800; font-size: .95rem; }
+.person-bio { margin: 0; font-size: .95rem; text-align: left; white-space: pre-line; }
+
 /* ---------- Blob photo frames ---------- */
 .blob {
     position: relative; z-index: 1; overflow: hidden; isolation: isolate; transform: translateZ(0);

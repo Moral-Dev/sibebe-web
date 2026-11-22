@@ -1,5 +1,5 @@
 <?php
-/* Public content for the site: reviews, gallery, events, price list. GET ?type=... */
+/* Public content for the site: reviews, gallery, events, team. GET ?type=... */
 
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
@@ -29,6 +29,13 @@ try {
                 'link' => $row['link'],
                 'past' => new DateTimeImmutable($row['event_date']) < $now,
             ], $rows));
+
+        case 'categories':
+            json_out(array_map(fn ($slug, $label) => ['key' => $slug, 'label' => $label], array_keys(gallery_categories()), gallery_categories()));
+
+        case 'team':
+            ensure_team_table();
+            json_out($pdo->query("SELECT name, role, bio, photo FROM team WHERE visible = 1 ORDER BY sort, id")->fetchAll());
 
         default:
             json_out(['error' => 'Unknown type'], 400);
