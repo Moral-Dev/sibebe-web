@@ -109,6 +109,16 @@ const TEAM_TABLE = "CREATE TABLE IF NOT EXISTS team (
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
+const ARTICLES_TABLE = "CREATE TABLE IF NOT EXISTS articles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(190) NOT NULL,
+            description TEXT NOT NULL,
+            image VARCHAR(190) NULL,
+            link VARCHAR(500) NULL,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
 const GALLERY_CAT_TABLE = "CREATE TABLE IF NOT EXISTS gallery_categories (
             slug VARCHAR(60) PRIMARY KEY,
             label VARCHAR(80) NOT NULL,
@@ -159,6 +169,16 @@ function ensure_team_table(): void
     static $done = false;
     if (!$done) {
         db()->exec(TEAM_TABLE);
+        $done = true;
+    }
+}
+
+/* The articles table came after the first install, so it is created on first use */
+function ensure_articles_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(ARTICLES_TABLE);
         $done = true;
     }
 }
@@ -226,6 +246,7 @@ function schema(): array
             INDEX (event_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         TEAM_TABLE,
+        ARTICLES_TABLE,
         "CREATE TABLE IF NOT EXISTS settings (
             name VARCHAR(60) PRIMARY KEY,
             value TEXT NOT NULL

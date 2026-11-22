@@ -790,6 +790,13 @@ def build_academy():
             </div>
         </section>
 
+        <section class="section section--peach" data-articles-section hidden>
+            <div class="container">
+                <div class="section-head"><h2>Статии</h2></div>
+                <div class="event-row" data-articles></div>
+            </div>
+        </section>
+
 {cta_band()}'''
     return page('academy', 'Академия за родители | Sí bebé', 'Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.', body)
 

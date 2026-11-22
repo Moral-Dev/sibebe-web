@@ -406,6 +406,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('Събитието е изтрито.');
                 go('events');
 
+            case 'save_article':
+                ensure_articles_table();
+                $title = clean($_POST['title'] ?? '', 190);
+                $description = clean_text($_POST['description'] ?? '', 3000);
+                $link = clean($_POST['link'] ?? '', 500);
+                $visible = isset($_POST['visible']) ? 1 : 0;
+                if ($title === '') {
+                    throw new RuntimeException('Въведете заглавие на статията.');
+                }
+                if ($link !== '' && !preg_match('#^https?://#i', $link)) {
+                    throw new RuntimeException('Линкът трябва да започва с http:// или https://');
+                }
+                $image = !empty($_FILES['image']['name']) ? save_upload($_FILES['image']) : null;
+                if ($id) {
+                    if ($image) {
+                        $stmt = $pdo->prepare("SELECT image FROM articles WHERE id = ?");
+                        $stmt->execute([$id]);
+                        delete_upload($stmt->fetchColumn() ?: null);
+                        $pdo->prepare("UPDATE articles SET image = ? WHERE id = ?")->execute([$image, $id]);
+                    }
+                    $pdo->prepare("UPDATE articles SET title = ?, description = ?, link = ?, visible = ? WHERE id = ?")->execute([$title, $description, $link ?: null, $visible, $id]);
+                } else {
+                    $pdo->prepare("INSERT INTO articles (title, description, image, link, visible) VALUES (?, ?, ?, ?, ?)")->execute([$title, $description, $image, $link ?: null, $visible]);
+                }
+                flash('Статията е запазена.');
+                go('articles');
+            case 'delete_article':
+                ensure_articles_table();
+                $stmt = $pdo->prepare("SELECT image FROM articles WHERE id = ?");
+                $stmt->execute([$id]);
+                delete_upload($stmt->fetchColumn() ?: null);
+                $pdo->prepare("DELETE FROM articles WHERE id = ?")->execute([$id]);
+                flash('Статията е изтрита.');
+                go('articles');
+
             case 'save_team':
                 ensure_team_table();
                 $name = clean($_POST['name'] ?? '', 120);
@@ -551,6 +586,7 @@ $nav = [
     'reviews' => ['Отзиви', 'star'],
     'gallery' => ['Галерия', 'photo'],
     'events' => ['Събития', 'event'],
+    'articles' => ['Статии', 'doc'],
     'team' => ['Екип', 'users'],
     'images' => ['Снимки в сайта', 'image'],
     'account' => ['Профил и настройки', 'key'],
@@ -586,6 +622,7 @@ render_head($nav[$page][0]);
             case 'reviews': page_reviews($pdo); break;
             case 'gallery': page_gallery($pdo); break;
             case 'events': page_events($pdo); break;
+            case 'articles': page_articles($pdo); break;
             case 'team': page_team($pdo); break;
             case 'images': page_images(); break;
             case 'account': page_account($pdo); break;
@@ -958,6 +995,55 @@ function page_events(PDO $pdo): void
                 <div class="card-actions">
                     <a class="btn btn--small btn--ghost" href="?p=events&amp;edit=<?= $r['id'] ?>">Редактирай</a>
                     <form method="post" data-confirm="Да изтрия ли събитието?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_event"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </div>
+    <?php
+}
+
+function page_articles(PDO $pdo): void
+{
+    ensure_articles_table();
+    $edit = null;
+    if (!empty($_GET['edit'])) {
+        $stmt = $pdo->prepare("SELECT * FROM articles WHERE id = ?");
+        $stmt->execute([(int) $_GET['edit']]);
+        $edit = $stmt->fetch() ?: null;
+    }
+    $rows = $pdo->query("SELECT * FROM articles ORDER BY created_at DESC, id DESC")->fetchAll();
+    ?>
+    <header class="page-head"><h1>Статии</h1></header>
+    <p class="muted">Статиите се показват на страница „Академия за родители“, най-новите първи.</p>
+    <section class="panel">
+        <h2><?= $edit ? 'Редакция на статия' : 'Нова статия' ?></h2>
+        <form method="post" enctype="multipart/form-data" class="form-grid">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_article"><input type="hidden" name="id" value="<?= $edit['id'] ?? '' ?>">
+            <label>Заглавие<input name="title" value="<?= h($edit['title'] ?? '') ?>" required></label>
+            <label>Линк към статията<input type="url" name="link" value="<?= h($edit['link'] ?? '') ?>" placeholder="https://"></label>
+            <label class="span-2">Описание<textarea name="description" rows="4" placeholder="Кратко резюме, което да покани родителите да прочетат статията"><?= h($edit['description'] ?? '') ?></textarea></label>
+            <label>Снимка<?= $edit && $edit['image'] ? ' (оставете празно, за да запазите сегашната)' : '' ?><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+            <div class="team-form-side">
+                <?php if ($edit && $edit['image']): ?><div class="team-current"><img src="../<?= h($edit['image']) ?>" alt=""></div><?php endif; ?>
+                <label class="check"><input type="checkbox" name="visible"<?= ($edit['visible'] ?? 1) ? ' checked' : '' ?>> Показвай на сайта</label>
+            </div>
+            <div class="form-actions span-2"><button class="btn" type="submit">Запази</button><?php if ($edit): ?><a class="btn btn--ghost" href="?p=articles">Откажи</a><?php endif; ?></div>
+        </form>
+    </section>
+    <?php if (!$rows): ?>
+        <p class="muted">Все още няма статии. Докато няма, секцията не се показва на сайта.</p>
+    <?php endif; ?>
+    <div class="cards">
+        <?php foreach ($rows as $r): ?>
+            <article class="card<?= $r['visible'] ? '' : ' card--muted' ?>">
+                <?php if ($r['image']): ?><img class="card-img" src="../<?= h($r['image']) ?>" alt="" loading="lazy"><?php endif; ?>
+                <p class="muted small"><?= fmt_date($r['created_at']) ?><?= $r['visible'] ? '' : ' · <span class="pill">скрита</span>' ?></p>
+                <h3><?= h($r['title']) ?></h3>
+                <?php if ($r['description']): ?><p><?= nl2br(h($r['description'])) ?></p><?php endif; ?>
+                <?php if ($r['link']): ?><p class="small"><a href="<?= h($r['link']) ?>" target="_blank" rel="noopener"><?= h(parse_url($r['link'], PHP_URL_HOST) ?: $r['link']) ?> ↗</a></p><?php endif; ?>
+                <div class="card-actions">
+                    <a class="btn btn--small btn--ghost" href="?p=articles&amp;edit=<?= $r['id'] ?>">Редактирай</a>
+                    <form method="post" data-confirm="Да изтрия ли статията?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_article"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
                 </div>
             </article>
         <?php endforeach; ?>

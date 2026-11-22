@@ -30,6 +30,10 @@ try {
                 'past' => new DateTimeImmutable($row['event_date']) < $now,
             ], $rows));
 
+        case 'articles':
+            ensure_articles_table();
+            json_out($pdo->query("SELECT title, description, image, link FROM articles WHERE visible = 1 ORDER BY created_at DESC, id DESC")->fetchAll());
+
         case 'categories':
             json_out(array_map(fn ($slug, $label) => ['key' => $slug, 'label' => $label], array_keys(gallery_categories()), gallery_categories()));
 

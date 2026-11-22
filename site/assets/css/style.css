@@ -333,7 +333,6 @@ main { position: relative; }
 .person, .review, .event-body, .tile figcaption { overflow-wrap: anywhere; min-width: 0; }
 
 /* ---------- Team on the About page ---------- */
-.people { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 320px)); justify-content: center; gap: 26px; }
 .person {
     padding: 28px 24px 26px; border-radius: var(--radius); background: var(--white); text-align: center;
     box-shadow: var(--shadow-sm); transition: transform .4s var(--ease), box-shadow .4s var(--ease);
@@ -678,7 +677,36 @@ mark {
 .steps h3 { margin-bottom: 2px; }
 
 /* ---------- Reviews ---------- */
-.reviews { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 26px; }
+.card-row-wrap { position: relative; }
+/* Reviews and events sit on one row: cards slide sideways (swipe, trackpad or the arrows) instead of wrapping */
+.reviews, .event-row, .people {
+    display: flex; justify-content: safe center; gap: 26px; overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none;
+    padding: 16px 18px 40px; margin: -16px -18px -40px; scroll-padding-inline: 18px;
+}
+/* Inside the row the lift shadow is kept short so the scroll edge never cuts it off */
+.reviews .review:hover, .event-row .event:hover, .people .person:hover { transform: translateY(-6px); box-shadow: 0 20px 30px -18px rgba(44, 16, 78, .32); }
+.reviews::-webkit-scrollbar, .event-row::-webkit-scrollbar, .people::-webkit-scrollbar { display: none; }
+.reviews > .loading-note { flex: 1; }
+.review, .event-row .event { flex: 0 0 calc((100% - 52px) / 3); scroll-snap-align: start; }
+@media (max-width: 980px) { .review, .event-row .event { flex-basis: calc((100% - 26px) / 2); } }
+@media (max-width: 640px) { .review, .event-row .event { flex-basis: 86%; } }
+/* Team cards are narrower: four on a row, then three, two and one */
+.people .person { flex: 0 0 calc((100% - 78px) / 4); scroll-snap-align: start; }
+@media (max-width: 1100px) { .people .person { flex-basis: calc((100% - 52px) / 3); } }
+@media (max-width: 800px) { .people .person { flex-basis: calc((100% - 26px) / 2); } }
+@media (max-width: 560px) { .people .person { flex-basis: 80%; } }
+.card-row-nav { display: flex; justify-content: center; gap: 12px; margin-top: 18px; }
+.card-row-nav[hidden] { display: none; }
+.card-row-nav button {
+    display: grid; place-items: center; width: 46px; height: 46px; border: 0; border-radius: 50%;
+    background: var(--white); color: var(--plum-700); box-shadow: var(--shadow-sm); cursor: pointer;
+    transition: transform .3s var(--ease), opacity .3s;
+}
+.section--white .card-row-nav button { background: var(--lavender); }
+.card-row-nav button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.card-row-nav button:disabled { opacity: .35; cursor: default; }
+.card-row-nav svg { width: 20px; height: 20px; }
 .review {
     position: relative; padding: 40px 32px 32px; border-radius: var(--radius);
     background: var(--white); box-shadow: var(--shadow-sm);
@@ -695,7 +723,6 @@ mark {
 /* ---------- Events ---------- */
 .events-group + .events-group { margin-top: 70px; }
 .events-group h2 { text-align: center; margin-bottom: 36px; }
-.event-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 26px; }
 .event { overflow: hidden; border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-sm); transition: transform .45s var(--ease), box-shadow .45s var(--ease); }
 .event:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
 .event-media { position: relative; aspect-ratio: 16 / 10; background: var(--lavender); overflow: hidden; }
@@ -1183,6 +1210,31 @@ img.logo-show { animation: logo-show .7s var(--spring) both; }
 
 /* Reviews and event descriptions keep the paragraphs typed in the admin panel */
 .review p, .event-body p { white-space: pre-line; }
+/* Long reviews and event descriptions are cut short; "Прочети още" opens the whole text in a window */
+.review p.is-clamped { display: -webkit-box; -webkit-line-clamp: 6; line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.person-bio.is-clamped { display: -webkit-box; -webkit-line-clamp: 5; line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.event-body p.is-clamped { display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.card-more {
+    display: block; margin: 10px 0 0; padding: 0; border: 0; background: none; cursor: pointer;
+    font: inherit; font-weight: 700; font-size: .95rem; color: var(--plum);
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+.card-more:hover { color: var(--plum-700); }
+.event-body .card-more + a { display: inline-block; margin-top: 10px; }
+@media (min-width: 641px) { .card-dialog { width: min(640px, calc(100% - 32px)); } }
+.card-dialog .policy-head { align-items: flex-start; }
+.card-dialog .stars { margin-bottom: 8px; }
+.card-dialog .event-date { margin-bottom: 8px; }
+.card-dialog .person-role { margin: 4px 0 0; }
+.card-dialog-head { display: flex; align-items: center; gap: 16px; }
+.card-dialog-face { width: 72px; height: 72px; flex-shrink: 0; border-radius: 58% 42% 52% 48% / 46% 52% 48% 54%; object-fit: cover; box-shadow: 0 0 0 4px var(--mint); }
+.card-dialog-face[hidden], .card-dialog-img[hidden] { display: none; }
+.card-dialog .policy-head h2 { font-size: 1.3rem; }
+.card-dialog .policy-body { padding-top: 16px; padding-bottom: 26px; }
+.card-dialog-img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 18px; margin-bottom: 18px; }
+.card-dialog .policy-body p { margin: 0; white-space: pre-line; }
+.card-dialog-link { margin-top: 16px; font-family: var(--font-head); font-weight: 800; }
+.card-dialog-link:empty { display: none; }
 
 /* ---------- Animations rest while their part of the page is off screen (set by site.js) ---------- */
 .anim-paused, .anim-paused *, .anim-paused::before, .anim-paused::after, .anim-paused *::before, .anim-paused *::after { animation-play-state: paused !important; }
