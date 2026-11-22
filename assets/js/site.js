@@ -53,7 +53,7 @@ function initMenu() {
     });
     window.addEventListener('resize', () => {
         if (!header.classList.contains('nav-open')) return;
-        if (window.innerWidth > 1180) setOpen(false); else setTop();
+        if (window.innerWidth > 1240) setOpen(false); else setTop();
     });
 
     // On desktop the menu also opens on hover, so the arrow must be able to close it too

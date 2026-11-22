@@ -1014,7 +1014,7 @@ function page_articles(PDO $pdo): void
     $rows = $pdo->query("SELECT * FROM articles ORDER BY created_at DESC, id DESC")->fetchAll();
     ?>
     <header class="page-head"><h1>Статии</h1></header>
-    <p class="muted">Статиите се показват на страница „Академия за родители“, най-новите първи.</p>
+    <p class="muted">Статиите се показват на страница „Пространство за родители“, най-новите първи.</p>
     <section class="panel">
         <h2><?= $edit ? 'Редакция на статия' : 'Нова статия' ?></h2>
         <form method="post" enctype="multipart/form-data" class="form-grid">

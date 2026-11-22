@@ -114,7 +114,7 @@ NAV = [
     ('index', 'index.html', 'Начало'),
     ('about', 'about.html', 'За нас'),
     ('baby-center', 'baby-center.html', 'Бебешки център'),
-    ('academy', 'academy.html', 'Академия за родители'),
+    ('academy', 'academy.html', 'Пространство за родители'),
     ('partners', 'partners.html', 'Партньори'),
     ('gallery', 'gallery.html', 'Галерия'),
     ('shop', 'shop.html', 'Магазин'),
@@ -780,7 +780,7 @@ def build_academy():
                         <h3>{t}</h3>
                         <p>{x}</p>
                     </article>''' for i, (ic, t, x) in enumerate(items))
-    body = f'''{intro('Академия за родители', 'academy-intro', 'Възпитателка играе с две малки деца на масичка с дървени играчки', subtitle='Вашето място за въпроси и отговори', lead='<p class="lead">Тук не сте сами в предизвикателствата на родителството.</p>')}
+    body = f'''{intro('Пространство за родители', 'academy-intro', 'Възпитателка играе с две малки деца на масичка с дървени играчки', subtitle='Вашето място за въпроси и отговори', lead='<p class="lead">Тук не сте сами в предизвикателствата на родителството.</p>')}
 
         <section class="section section--white">
             <div class="container">
@@ -798,7 +798,7 @@ def build_academy():
         </section>
 
 {cta_band()}'''
-    return page('academy', 'Академия за родители | Sí bebé', 'Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.', body)
+    return page('academy', 'Пространство за родители | Sí bebé', 'Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.', body)
 
 
 def form_field(label, inner, fid):
@@ -1014,7 +1014,7 @@ SLOTS = [
     ('baby-expertise', 'Бебешки център', 'Експертност и спокойствие', 'hero-bg.webp'),
     ('baby-adaptation', 'Бебешки център', 'Адаптация', 'missions.webp'),
     ('price-list', 'Бебешки център', 'Ценоразпис', 'price-list.webp'),
-    ('academy-intro', 'Академия за родители', 'Снимка горе', 'missions.webp'),
+    ('academy-intro', 'Пространство за родители', 'Снимка горе', 'missions.webp'),
     ('partners-intro', 'Партньори', 'Снимка горе', 'vission.webp'),
     ('gallery-intro', 'Галерия', 'Снимка горе', 'vission.webp'),
     ('shop-intro', 'Магазин', 'Снимка горе', 'hero-bg.webp'),
