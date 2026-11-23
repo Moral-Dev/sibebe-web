@@ -63,6 +63,7 @@ function icon(string $name): string
         'home' => '<path d="M3 11l9-8 9 8v10H3z"/><path d="M9 21v-6h6v6"/>',
         'out' => '<path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3"/>',
         'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'help' => '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
         'image' => '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/>',
     ];
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($paths[$name] ?? '') . '</svg>';
@@ -442,6 +443,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('Статията е изтрита.');
                 go('articles');
 
+            case 'save_faq':
+                ensure_faq_table();
+                $question = clean($_POST['question'] ?? '', 300);
+                $answer = clean_text($_POST['answer'] ?? '', 5000);
+                $visible = isset($_POST['visible']) ? 1 : 0;
+                if ($question === '' || $answer === '') {
+                    throw new RuntimeException('Въведете въпрос и отговор.');
+                }
+                if ($id) {
+                    $pdo->prepare("UPDATE faq SET question = ?, answer = ?, visible = ? WHERE id = ?")->execute([$question, $answer, $visible, $id]);
+                } else {
+                    $sort = (int) $pdo->query("SELECT COALESCE(MAX(sort), 0) + 1 FROM faq")->fetchColumn();
+                    $pdo->prepare("INSERT INTO faq (question, answer, visible, sort) VALUES (?, ?, ?, ?)")->execute([$question, $answer, $visible, $sort]);
+                }
+                flash('Въпросът е запазен.');
+                go('faq');
+            case 'delete_faq':
+                ensure_faq_table();
+                $pdo->prepare("DELETE FROM faq WHERE id = ?")->execute([$id]);
+                flash('Въпросът е изтрит.');
+                go('faq');
+            case 'move_faq':
+                ensure_faq_table();
+                $ids = $pdo->query("SELECT id FROM faq ORDER BY sort, id")->fetchAll(PDO::FETCH_COLUMN);
+                $pos = array_search($id, array_map('intval', $ids), true);
+                $to = $pos === false ? false : $pos + (($_POST['dir'] ?? '') === 'up' ? -1 : 1);
+                if ($pos !== false && isset($ids[$to])) {
+                    [$ids[$pos], $ids[$to]] = [$ids[$to], $ids[$pos]];
+                }
+                $stmt = $pdo->prepare("UPDATE faq SET sort = ? WHERE id = ?");
+                foreach ($ids as $i => $rowId) {
+                    $stmt->execute([$i + 1, $rowId]);
+                }
+                go('faq');
+
             case 'save_routine':
                 ensure_routine_table();
                 $from = routine_time((string) ($_POST['time_from'] ?? ''));
@@ -660,6 +696,7 @@ $nav = [
     'gallery' => ['Галерия', 'photo'],
     'events' => ['Събития', 'event'],
     'articles' => ['Статии', 'doc'],
+    'faq' => ['Въпроси и отговори', 'help'],
     'routine' => ['Дневен режим', 'clock'],
     'team' => ['Екип', 'users'],
     'images' => ['Снимки в сайта', 'image'],
@@ -697,6 +734,7 @@ render_head($nav[$page][0]);
             case 'gallery': page_gallery($pdo); break;
             case 'events': page_events($pdo); break;
             case 'articles': page_articles($pdo); break;
+            case 'faq': page_faq($pdo); break;
             case 'routine': page_routine($pdo); break;
             case 'team': page_team($pdo); break;
             case 'images': page_images(); break;
@@ -1123,6 +1161,54 @@ function page_articles(PDO $pdo): void
             </article>
         <?php endforeach; ?>
     </div>
+    <?php
+}
+
+function page_faq(PDO $pdo): void
+{
+    ensure_faq_table();
+    $edit = null;
+    if (!empty($_GET['edit'])) {
+        $stmt = $pdo->prepare("SELECT * FROM faq WHERE id = ?");
+        $stmt->execute([(int) $_GET['edit']]);
+        $edit = $stmt->fetch() ?: null;
+    }
+    $rows = $pdo->query("SELECT * FROM faq ORDER BY sort, id")->fetchAll();
+    ?>
+    <header class="page-head"><h1>Въпроси и отговори</h1></header>
+    <p class="muted">Въпросите се показват на страница „Пространство за родители“, в реда от списъка. Родителят натиска въпроса и под него се отваря отговорът.</p>
+    <section class="panel">
+        <h2><?= $edit ? 'Редакция на въпрос' : 'Нов въпрос' ?></h2>
+        <form method="post" class="form-grid">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_faq"><input type="hidden" name="id" value="<?= $edit['id'] ?? '' ?>">
+            <label class="span-2">Въпрос<input name="question" value="<?= h($edit['question'] ?? '') ?>" maxlength="300" placeholder="напр. От каква възраст приемате деца?" required></label>
+            <label class="span-2">Отговор<textarea name="answer" rows="5" required><?= h($edit['answer'] ?? '') ?></textarea></label>
+            <div class="team-form-side span-2">
+                <label class="check"><input type="checkbox" name="visible"<?= ($edit['visible'] ?? 1) ? ' checked' : '' ?>> Показвай на сайта</label>
+            </div>
+            <div class="form-actions span-2"><button class="btn" type="submit"><?= $edit ? 'Запази' : 'Добави' ?></button><?php if ($edit): ?><a class="btn btn--ghost" href="?p=faq">Откажи</a><?php endif; ?></div>
+        </form>
+    </section>
+    <?php if ($rows): ?>
+        <div class="panel faq-list">
+            <?php foreach ($rows as $i => $r): ?>
+                <div class="faq-row<?= $r['visible'] ? '' : ' card--muted' ?>">
+                    <div>
+                        <h3><?= h($r['question']) ?><?= $r['visible'] ? '' : ' <span class="pill">скрит</span>' ?></h3>
+                        <p class="muted"><?= nl2br(h($r['answer'])) ?></p>
+                    </div>
+                    <div class="card-actions">
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_faq"><input type="hidden" name="dir" value="up"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-нагоре"<?= $i === 0 ? ' disabled' : '' ?>>↑</button></form>
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_faq"><input type="hidden" name="dir" value="down"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-надолу"<?= $i === count($rows) - 1 ? ' disabled' : '' ?>>↓</button></form>
+                        <a class="btn btn--small btn--ghost" href="?p=faq&amp;edit=<?= $r['id'] ?>">Редактирай</a>
+                        <form method="post" data-confirm="Да изтрия ли въпроса?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_faq"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="muted">Все още няма въпроси. Докато няма, секцията не се показва на сайта.</p>
+    <?php endif; ?>
     <?php
 }
 

@@ -119,6 +119,14 @@ const ARTICLES_TABLE = "CREATE TABLE IF NOT EXISTS articles (
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
+const FAQ_TABLE = "CREATE TABLE IF NOT EXISTS faq (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            question VARCHAR(300) NOT NULL,
+            answer TEXT NOT NULL,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
 const GALLERY_CAT_TABLE = "CREATE TABLE IF NOT EXISTS gallery_categories (
             slug VARCHAR(60) PRIMARY KEY,
             label VARCHAR(80) NOT NULL,
@@ -179,6 +187,15 @@ function ensure_articles_table(): void
     static $done = false;
     if (!$done) {
         db()->exec(ARTICLES_TABLE);
+        $done = true;
+    }
+}
+
+function ensure_faq_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(FAQ_TABLE);
         $done = true;
     }
 }
@@ -247,6 +264,7 @@ function schema(): array
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         TEAM_TABLE,
         ARTICLES_TABLE,
+        FAQ_TABLE,
         ROUTINE_TABLE,
         "CREATE TABLE IF NOT EXISTS settings (
             name VARCHAR(60) PRIMARY KEY,

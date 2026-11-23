@@ -110,6 +110,20 @@ BABY_SECTIONS = [
     ('pricing', 'График и ценоразпис'),
 ]
 
+ABOUT_SECTIONS = [
+    ('mission', 'Мисия'),
+    ('vision', 'Визия'),
+    ('goals', 'Цели'),
+    ('team', 'Екип'),
+    ('reviews', 'Отзиви от родители'),
+]
+
+# Pages with a drop-down of their sections: page key -> (sections, id of the drop-down)
+SUB_MENUS = {
+    'about': (ABOUT_SECTIONS, 'sub-about'),
+    'baby-center': (BABY_SECTIONS, 'sub-baby'),
+}
+
 NAV = [
     ('index', 'index.html', 'Начало'),
     ('about', 'about.html', 'За нас'),
@@ -126,14 +140,15 @@ def header(active):
     items = []
     for key, href, label in NAV:
         current = ' aria-current="page"' if key == active else ''
-        if key == 'baby-center':
-            subs = '\n'.join(f'                            <li><a href="baby-center.html#{h}">{t}</a></li>' for h, t in BABY_SECTIONS)
+        if key in SUB_MENUS:
+            sections, sub_id = SUB_MENUS[key]
+            subs = '\n'.join(f'                            <li><a href="{href}#{h}">{t}</a></li>' for h, t in sections)
             items.append(f'''                    <li class="has-sub">
                         <div class="has-sub-head">
                             <a class="nav-link" href="{href}"{current}>{label}</a>
-                            <button type="button" class="sub-toggle" aria-expanded="false" aria-controls="sub-baby" aria-label="Покажи разделите">{svg('chevron', 16, 2.5)}</button>
+                            <button type="button" class="sub-toggle" aria-expanded="false" aria-controls="{sub_id}" aria-label="Покажи разделите">{svg('chevron', 16, 2.5)}</button>
                         </div>
-                        <ul class="sub-menu" id="sub-baby">
+                        <ul class="sub-menu" id="{sub_id}">
 {subs}
                         </ul>
                     </li>''')
@@ -452,7 +467,7 @@ def build_home():
         <section class="section section--peach">
             <div class="container">
                 <div class="section-head"><h2>Отзиви от родители</h2></div>
-                <div class="reviews" data-reviews><p class="loading-note">Зареждане...</p></div>
+                <div class="reviews" data-reviews><p class="loading-note">Зареждане<span class="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p></div>
             </div>
         </section>
 
@@ -495,7 +510,7 @@ def build_about():
                     </article>''' for ic, t, x in team)
     body = f'''{intro('За нас', 'about-intro', 'Бебе играе с дървена играчка на килима', subtitle='Стандарт в ранната грижа')}
 
-        <section class="section section--white">
+        <section class="section section--white" id="mission">
             <div class="container split split--reverse">
                 <div class="split-media">
                     {split_deco()}
@@ -513,7 +528,7 @@ def build_about():
             </div>
         </section>
 
-        <section class="section section--night" data-stars>
+        <section class="section section--night" id="vision" data-stars>
             <div class="container">
                 <div class="section-head">
                     <span class="eyebrow">Визия</span>
@@ -531,7 +546,7 @@ def build_about():
             </div>
         </section>
 
-        <section class="section">
+        <section class="section" id="goals">
             <div class="container">
                 <div class="section-head">
                     <span class="eyebrow">Цели</span>
@@ -543,7 +558,7 @@ def build_about():
             </div>
         </section>
 
-        <section class="section section--mint">
+        <section class="section section--mint" id="team">
             <div class="container">
                 <div class="section-head">
                     <span class="eyebrow">Екип</span>
@@ -577,10 +592,10 @@ def build_about():
             </div>
         </section>
 
-        <section class="section section--peach">
+        <section class="section section--peach" id="reviews">
             <div class="container">
                 <div class="section-head"><h2>Отзиви от родители</h2></div>
-                <div class="reviews" data-reviews><p class="loading-note">Зареждане...</p></div>
+                <div class="reviews" data-reviews><p class="loading-note">Зареждане<span class="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p></div>
             </div>
         </section>'''
     return page('about', 'За нас | Sí bebé', 'Мисия, визия и екип на Sí bebé. Ранна грижа, водена от доктор по детска психология.', body)
@@ -615,7 +630,8 @@ def build_baby():
                 ('calendar', 'Тематични работилници', 'Уикенд събития за цялото семейство.'),
                 ('heart', 'Мама и бебе', 'Специални класове за заздравяване на връзката и споделен опит.'),
                 ('cake', 'Бебешки рожден ден', 'Организираме първите празници с внимание към детайла и нуждите на малките.'),
-                ('chat', 'Консултации', 'Индивидуални срещи с логопед или детски психолог.')]
+                ('chat', 'Консултации', 'Индивидуални срещи с логопед или детски психолог.'),
+                ('edu', 'Адаптация към ясла и детска градина', 'Подготвяме детето постепенно и спокойно за прехода към ясла или детска градина, в партньорство с родителите.')]
     ages = [('0–6 месеца', 'Нежни стимули, масаж и визуално проследяване.'),
             ('6–12 месеца', 'Пълзене, седене и опознаване на предмети.'),
             ('12–24 месеца', 'Първи стъпки, прохождане и езиково развитие.'),
@@ -696,7 +712,7 @@ def build_baby():
         <section class="section section--white" id="services">
             <div class="container">
                 <div class="section-head"><h2>Услуги</h2></div>
-                <div class="card-grid card-grid--3">
+                <div class="card-grid card-grid--3 card-grid--center">
 {cards(services)}
                 </div>
             </div>
@@ -802,6 +818,13 @@ def build_academy():
             </div>
         </section>
 
+        <section class="section section--white" id="faq" data-faq-section hidden>
+            <div class="container">
+                <div class="section-head"><h2>Въпроси и отговори</h2></div>
+                <div class="faq" data-faq></div>
+            </div>
+        </section>
+
 {cta_band()}'''
     return page('academy', 'Пространство за родители | Sí bebé', 'Лекции, семинари, психологическа подкрепа и срещи с педиатри и консултанти по сън и захранване за родители във Варна.', body)
 
@@ -867,7 +890,7 @@ def build_gallery():
                 <div class="filters" role="group" aria-label="Категории снимки" data-gallery-filters>
 {f_html}
                 </div>
-                <div class="mosaic" data-gallery><p class="loading-note">Зареждане...</p></div>
+                <div class="mosaic" data-gallery><p class="loading-note">Зареждане<span class="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p></div>
             </div>
         </section>
 
