@@ -374,3 +374,15 @@ input[type="checkbox"]:indeterminate { border-color: var(--plum); background: va
 /* Buttons keep their word on one line */
 .btn { white-space: nowrap; }
 .entry-note button { flex-shrink: 0; }
+
+/* Daily routine */
+.routine-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.routine-list { display: grid; gap: 0; padding: 6px 18px; }
+.routine-row { display: grid; grid-template-columns: 130px 1fr auto; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line, #eee); }
+.routine-row:last-child { border-bottom: 0; }
+.routine-row.is-focus .routine-time { color: var(--plum, #5B3E96); }
+.routine-time { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.routine-row .card-actions { margin: 0; }
+@media (max-width: 760px) {
+    .routine-row { grid-template-columns: 1fr; gap: 6px; }
+}

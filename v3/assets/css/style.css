@@ -607,7 +607,7 @@ mark {
 @keyframes heartbeat { 0%, 60%, 100% { transform: scale(1); } 10%, 30% { transform: scale(1.12); } 20% { transform: scale(1.02); } }
 
 /* ---------- Daily routine ---------- */
-.day-strip { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.day-strip { position: relative; display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 18px; }
 .day-strip::before {
     content: ""; position: absolute; left: 10%; right: 10%; top: 36px; height: 3px;
     background: repeating-linear-gradient(90deg, var(--lav-500) 0 10px, transparent 10px 18px);

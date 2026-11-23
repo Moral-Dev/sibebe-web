@@ -2,6 +2,8 @@
 /*.html
 !/maintenance.html
 /api/slots.php
+/api/routine_default.php
+/api/routine.php
 # Server-only: database settings, admin uploads, and the "site hidden" switch
 /api/config.php
 /uploads/*

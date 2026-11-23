@@ -247,6 +247,7 @@ function schema(): array
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         TEAM_TABLE,
         ARTICLES_TABLE,
+        ROUTINE_TABLE,
         "CREATE TABLE IF NOT EXISTS settings (
             name VARCHAR(60) PRIMARY KEY,
             value TEXT NOT NULL
@@ -574,6 +575,134 @@ function delete_upload(?string $path): void
     }
 }
 
+
+/* ---------- Daily routine managed in the admin ---------- */
+// Rows live in the routine table; api/routine.php is a cache that render.php reads. Until the table
+// exists the pages keep the routine written by tools/build.py (api/routine_default.php has the same rows).
+const ROUTINE_CACHE = __DIR__ . '/routine.php';
+const ROUTINE_TABLE = "CREATE TABLE IF NOT EXISTS routine (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            time_from VARCHAR(5) NOT NULL,
+            time_to VARCHAR(5) NOT NULL DEFAULT '',
+            text VARCHAR(255) NOT NULL,
+            focus TINYINT(1) NOT NULL DEFAULT 0,
+            on_home TINYINT(1) NOT NULL DEFAULT 0,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+function ensure_routine_table(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo = db();
+    $pdo->exec(ROUTINE_TABLE);
+    // First time: start from the routine that is on the site now
+    if (setting('routine_seeded') === null) {
+        $defaults = is_file(__DIR__ . '/routine_default.php') ? include __DIR__ . '/routine_default.php' : [];
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM routine")->fetchColumn()) {
+            $stmt = $pdo->prepare("INSERT INTO routine (time_from, time_to, text, focus, on_home, sort) VALUES (?, ?, ?, ?, ?, ?)");
+            foreach ($defaults as $i => $row) {
+                $stmt->execute([$row['from'], $row['to'], $row['text'], $row['focus'] ? 1 : 0, $row['home'] ? 1 : 0, $i + 1]);
+            }
+        }
+        set_setting('routine_seeded', '1');
+        rebuild_routine_cache();
+    }
+    $done = true;
+}
+
+function rebuild_routine_cache(): void
+{
+    $rows = db()->query("SELECT time_from, time_to, text, focus, on_home FROM routine ORDER BY sort, id")->fetchAll();
+    $tmp = ROUTINE_CACHE . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    file_put_contents($tmp, "<?php\n// Daily routine from the admin panel. Generated from the database; do not edit.\nreturn " . var_export($rows, true) . ";\n");
+    if (!@rename($tmp, ROUTINE_CACHE)) {
+        @unlink($tmp);
+        throw new RuntimeException('Режимът не можа да бъде записан. Проверете правата на папка api.');
+    }
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(ROUTINE_CACHE, true);
+    }
+}
+
+/* Routine rows for the pages, or null to keep the built-in ones */
+function routine_rows(): ?array
+{
+    if (!is_file(ROUTINE_CACHE)) {
+        try {
+            ensure_routine_table(); // first visit after the update: seed the table and write the cache
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+    $rows = is_file(ROUTINE_CACHE) ? include ROUTINE_CACHE : null;
+    return is_array($rows) && $rows ? $rows : null;
+}
+
+function apply_routine(string $html): string
+{
+    if (!str_contains($html, '<ol class="timeline">') && !str_contains($html, '<ol class="day-strip"')) {
+        return $html;
+    }
+    $rows = routine_rows();
+    if (!$rows) {
+        return $html;
+    }
+    $e = fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    $full = '';
+    $home = '';
+    $homeCount = 0;
+    foreach ($rows as $row) {
+        $time = $row['time_to'] !== '' ? $row['time_from'] . ' – ' . $row['time_to'] : $row['time_from'];
+        $full .= "\n                    <li" . ($row['focus'] ? ' class="is-focus"' : '') . "><time>{$e($time)}</time><span>{$e($row['text'])}</span></li>";
+        if ($row['on_home']) {
+            $home .= "\n                    <li><time>{$e($row['time_from'])}</time><span>{$e($row['text'])}</span></li>";
+            $homeCount++;
+        }
+    }
+    $html = preg_replace_callback('#<ol class="timeline">[\s\S]*?</ol>#', fn () => "<ol class=\"timeline\">{$full}\n                </ol>", $html, 1) ?? $html;
+    if ($homeCount) {
+        $html = preg_replace_callback('#<ol class="day-strip"[^>]*>[\s\S]*?</ol>#', fn () => "<ol class=\"day-strip\" style=\"--n:{$homeCount}\">{$home}\n                </ol>", $html, 1) ?? $html;
+    }
+    return $html;
+}
+
+/* "7.30" or "07:30" -> "07:30"; '' when it is not a time */
+function routine_time(string $value): string
+{
+    if (!preg_match('/^\s*([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\s*$/', $value, $m)) {
+        return '';
+    }
+    return str_pad($m[1], 2, '0', STR_PAD_LEFT) . ':' . $m[2];
+}
+
+/* Routine text with a typographic dash: "занимание - музика" -> "занимание – музика" */
+function routine_text(mixed $value): string
+{
+    return preg_replace('/\s+[-–—]\s+/u', ' – ', clean($value, 255)) ?? '';
+}
+
+/* Pasted routine, one row per line: "07:30 - 09:00 - Прием и закуска" (the end time can be left out) */
+function parse_routine(string $text): array
+{
+    $rows = [];
+    $bad = [];
+    foreach (preg_split('/\R/u', $text) as $n => $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+        if (preg_match('/^(\d{1,2}\s*[:.]\s*\d{2})(?:\s*[-–—]\s*(\d{1,2}\s*[:.]\s*\d{2}))?\s*(?:[-–—:]\s*)?(\S.*)$/u', $line, $m)
+            && ($from = routine_time($m[1])) !== '' && ($m[2] === '' || routine_time($m[2]) !== '')) {
+            $rows[] = ['from' => $from, 'to' => $m[2] === '' ? '' : routine_time($m[2]), 'text' => routine_text($m[3])];
+        } else {
+            $bad[] = $n + 1;
+        }
+    }
+    return [$rows, $bad];
+}
 
 /* ---------- Texts edited on the page ---------- */
 // Saved texts live in the settings table as "text:<key>"; api/texts.php is a cache that render.php reads.

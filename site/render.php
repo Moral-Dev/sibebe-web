@@ -38,7 +38,7 @@ if (!is_file($file) || $page === '404') {
     http_response_code(404);
     $file = __DIR__ . '/404.html';
 }
-$html = apply_text_overrides((string) file_get_contents($file), text_overrides());
+$html = apply_routine(apply_text_overrides((string) file_get_contents($file), text_overrides()));
 // Forms get a fresh signed time stamp (see form_token in api/lib.php)
 if (str_contains($html, '<div class="hp"')) {
     $html = str_replace('<div class="hp"', '<input type="hidden" name="ft" value="' . form_token() . '"><div class="hp"', $html);

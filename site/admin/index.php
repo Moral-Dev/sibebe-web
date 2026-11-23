@@ -62,6 +62,7 @@ function icon(string $name): string
         'key' => '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>',
         'home' => '<path d="M3 11l9-8 9 8v10H3z"/><path d="M9 21v-6h6v6"/>',
         'out' => '<path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3"/>',
+        'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
         'image' => '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/>',
     ];
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($paths[$name] ?? '') . '</svg>';
@@ -441,6 +442,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('Статията е изтрита.');
                 go('articles');
 
+            case 'save_routine':
+                ensure_routine_table();
+                $from = routine_time((string) ($_POST['time_from'] ?? ''));
+                $toRaw = trim((string) ($_POST['time_to'] ?? ''));
+                $to = $toRaw === '' ? '' : routine_time($toRaw);
+                $text = routine_text($_POST['text'] ?? '');
+                if ($from === '' || ($toRaw !== '' && $to === '')) {
+                    throw new RuntimeException('Въведете час във вида 07:30.');
+                }
+                if ($text === '') {
+                    throw new RuntimeException('Въведете какво се случва в този час.');
+                }
+                $focus = isset($_POST['focus']) ? 1 : 0;
+                $home = isset($_POST['on_home']) ? 1 : 0;
+                if ($id) {
+                    $pdo->prepare("UPDATE routine SET time_from = ?, time_to = ?, text = ?, focus = ?, on_home = ? WHERE id = ?")->execute([$from, $to, $text, $focus, $home, $id]);
+                } else {
+                    // New rows go in their place by start time
+                    $sort = (int) $pdo->query("SELECT COALESCE(MAX(sort), 0) + 1 FROM routine")->fetchColumn();
+                    $pdo->prepare("INSERT INTO routine (time_from, time_to, text, focus, on_home, sort) VALUES (?, ?, ?, ?, ?, ?)")->execute([$from, $to, $text, $focus, $home, $sort]);
+                    $ids = $pdo->query("SELECT id FROM routine ORDER BY time_from, sort, id")->fetchAll(PDO::FETCH_COLUMN);
+                    $stmt = $pdo->prepare("UPDATE routine SET sort = ? WHERE id = ?");
+                    foreach ($ids as $i => $rowId) {
+                        $stmt->execute([$i + 1, $rowId]);
+                    }
+                }
+                rebuild_routine_cache();
+                flash('Дневният режим е запазен.');
+                go('routine');
+            case 'delete_routine':
+                ensure_routine_table();
+                $pdo->prepare("DELETE FROM routine WHERE id = ?")->execute([$id]);
+                rebuild_routine_cache();
+                flash('Редът е изтрит.');
+                go('routine');
+            case 'move_routine':
+                ensure_routine_table();
+                $ids = $pdo->query("SELECT id FROM routine ORDER BY sort, id")->fetchAll(PDO::FETCH_COLUMN);
+                $pos = array_search($id, array_map('intval', $ids), true);
+                $to = $pos === false ? false : $pos + (($_POST['dir'] ?? '') === 'up' ? -1 : 1);
+                if ($pos !== false && isset($ids[$to])) {
+                    [$ids[$pos], $ids[$to]] = [$ids[$to], $ids[$pos]];
+                }
+                $stmt = $pdo->prepare("UPDATE routine SET sort = ? WHERE id = ?");
+                foreach ($ids as $i => $rowId) {
+                    $stmt->execute([$i + 1, $rowId]);
+                }
+                rebuild_routine_cache();
+                go('routine');
+            case 'replace_routine':
+                ensure_routine_table();
+                [$rows, $bad] = parse_routine((string) ($_POST['routine'] ?? ''));
+                if ($bad) {
+                    throw new RuntimeException('Не разбрах ред ' . implode(', ', $bad) . '. Всеки ред трябва да е във вида: 07:30 - 09:00 - Прием и закуска');
+                }
+                if (!$rows) {
+                    throw new RuntimeException('Поставете поне един ред.');
+                }
+                // Home page: up to five rows spread over the day; they can be changed afterwards
+                $n = count($rows);
+                $home = $n <= 5 ? range(0, $n - 1) : array_map(fn ($i) => (int) round($i * ($n - 1) / 4), range(0, 4));
+                $pdo->beginTransaction();
+                $pdo->exec("DELETE FROM routine");
+                $stmt = $pdo->prepare("INSERT INTO routine (time_from, time_to, text, focus, on_home, sort) VALUES (?, ?, ?, 0, ?, ?)");
+                foreach ($rows as $i => $row) {
+                    $stmt->execute([$row['from'], $row['to'], $row['text'], in_array($i, $home, true) ? 1 : 0, $i + 1]);
+                }
+                $pdo->commit();
+                rebuild_routine_cache();
+                flash('Дневният режим е сменен: ' . $n . ' реда.');
+                go('routine');
+
             case 'save_team':
                 ensure_team_table();
                 $name = clean($_POST['name'] ?? '', 120);
@@ -587,6 +660,7 @@ $nav = [
     'gallery' => ['Галерия', 'photo'],
     'events' => ['Събития', 'event'],
     'articles' => ['Статии', 'doc'],
+    'routine' => ['Дневен режим', 'clock'],
     'team' => ['Екип', 'users'],
     'images' => ['Снимки в сайта', 'image'],
     'account' => ['Профил и настройки', 'key'],
@@ -623,6 +697,7 @@ render_head($nav[$page][0]);
             case 'gallery': page_gallery($pdo); break;
             case 'events': page_events($pdo); break;
             case 'articles': page_articles($pdo); break;
+            case 'routine': page_routine($pdo); break;
             case 'team': page_team($pdo); break;
             case 'images': page_images(); break;
             case 'account': page_account($pdo); break;
@@ -1048,6 +1123,70 @@ function page_articles(PDO $pdo): void
             </article>
         <?php endforeach; ?>
     </div>
+    <?php
+}
+
+function page_routine(PDO $pdo): void
+{
+    ensure_routine_table();
+    $edit = null;
+    if (!empty($_GET['edit'])) {
+        $stmt = $pdo->prepare("SELECT * FROM routine WHERE id = ?");
+        $stmt->execute([(int) $_GET['edit']]);
+        $edit = $stmt->fetch() ?: null;
+    }
+    $rows = $pdo->query("SELECT * FROM routine ORDER BY sort, id")->fetchAll();
+    $homeCount = count(array_filter($rows, fn ($r) => $r['on_home']));
+    $pasted = implode("\n", array_map(fn ($r) => $r['time_from'] . ($r['time_to'] !== '' ? ' - ' . $r['time_to'] : '') . ' - ' . $r['text'], $rows));
+    ?>
+    <header class="page-head"><h1>Дневен режим</h1></header>
+    <p class="muted">Целият режим се показва в „Бебешки център“. Редовете с отметка „На началната страница“ излизат и на началната страница, само с началния час.</p>
+    <section class="panel">
+        <h2><?= $edit ? 'Редакция на ред' : 'Нов ред' ?></h2>
+        <form method="post" class="form-grid routine-form">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_routine"><input type="hidden" name="id" value="<?= $edit['id'] ?? '' ?>">
+            <div class="routine-times">
+                <label>От<input name="time_from" value="<?= h($edit['time_from'] ?? '') ?>" placeholder="07:30" inputmode="numeric" maxlength="5" required></label>
+                <label>До<input name="time_to" value="<?= h($edit['time_to'] ?? '') ?>" placeholder="09:00" inputmode="numeric" maxlength="5"></label>
+            </div>
+            <label>Какво се случва<input name="text" value="<?= h($edit['text'] ?? '') ?>" placeholder="напр. Прием и закуска" maxlength="255" required></label>
+            <div class="team-form-side span-2">
+                <label class="check"><input type="checkbox" name="on_home"<?= ($edit['on_home'] ?? 0) ? ' checked' : '' ?>> На началната страница</label>
+                <label class="check"><input type="checkbox" name="focus"<?= ($edit['focus'] ?? 0) ? ' checked' : '' ?>> Открои реда (цветен фон)</label>
+            </div>
+            <div class="form-actions span-2"><button class="btn" type="submit"><?= $edit ? 'Запази' : 'Добави' ?></button><?php if ($edit): ?><a class="btn btn--ghost" href="?p=routine">Откажи</a><?php endif; ?></div>
+        </form>
+    </section>
+    <?php if ($homeCount > 6): ?>
+        <div class="notice">На началната страница има <?= $homeCount ?> реда. Там изглежда най-добре с 4–6.</div>
+    <?php endif; ?>
+    <?php if ($rows): ?>
+        <div class="panel routine-list">
+            <?php foreach ($rows as $i => $r): ?>
+                <div class="routine-row<?= $r['focus'] ? ' is-focus' : '' ?>">
+                    <span class="routine-time"><?= h($r['time_from']) ?><?= $r['time_to'] !== '' ? ' – ' . h($r['time_to']) : '' ?></span>
+                    <span class="routine-text"><?= h($r['text']) ?><?php if ($r['on_home']): ?> <span class="pill">начална</span><?php endif; ?></span>
+                    <div class="card-actions">
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_routine"><input type="hidden" name="dir" value="up"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-нагоре"<?= $i === 0 ? ' disabled' : '' ?>>↑</button></form>
+                        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="move_routine"><input type="hidden" name="dir" value="down"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--ghost" type="submit" title="По-надолу"<?= $i === count($rows) - 1 ? ' disabled' : '' ?>>↓</button></form>
+                        <a class="btn btn--small btn--ghost" href="?p=routine&amp;edit=<?= $r['id'] ?>">Редактирай</a>
+                        <form method="post" data-confirm="Да изтрия ли реда „<?= h($r['text']) ?>“?"><?= csrf_field() ?><input type="hidden" name="action" value="delete_routine"><input type="hidden" name="id" value="<?= $r['id'] ?>"><button class="btn btn--small btn--danger" type="submit">Изтрий</button></form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="muted">Няма редове. Докато няма, сайтът показва вградения режим.</p>
+    <?php endif; ?>
+    <section class="panel">
+        <h2>Смени целия режим наведнъж</h2>
+        <p class="muted small">Поставете режима, по един ред на час: <strong>07:30 - 09:00 - Прием и закуска</strong>. Сегашните редове се заменят. До 5 реда се избират автоматично за началната страница, после може да ги смените.</p>
+        <form method="post" data-confirm="Да заменя ли целия дневен режим с поставения?">
+            <?= csrf_field() ?><input type="hidden" name="action" value="replace_routine">
+            <label>Режим<textarea name="routine" rows="10" required><?= h($pasted) ?></textarea></label>
+            <div class="form-actions"><button class="btn" type="submit">Замени режима</button></div>
+        </form>
+    </section>
     <?php
 }
 
