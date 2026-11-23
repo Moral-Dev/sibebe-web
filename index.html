@@ -19,7 +19,7 @@
     <meta name="theme-color" content="#FFF8F1">
     <link rel="icon" type="image/png" href="assets/img/favicon.png">
     <link rel="stylesheet" href="assets/css/fonts.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=2bed21db">
+    <link rel="stylesheet" href="assets/css/style.css?v=b4f022b4">
     <link rel="preload" href="assets/fonts/nunito-cyrillic-TMnFcQIG.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/onest-cyrillic-oEoeyxMI.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/allura-latin-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -42,7 +42,19 @@
             <nav class="nav" id="site-nav" aria-label="Главно меню">
                 <ul class="nav-list">
                     <li><a class="nav-link" href="./" aria-current="page">Начало</a></li>
-                    <li><a class="nav-link" href="about">За нас</a></li>
+                    <li class="has-sub">
+                        <div class="has-sub-head">
+                            <a class="nav-link" href="about">За нас</a>
+                            <button type="button" class="sub-toggle" aria-expanded="false" aria-controls="sub-about" aria-label="Покажи разделите"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <ul class="sub-menu" id="sub-about">
+                            <li><a href="about#mission">Мисия</a></li>
+                            <li><a href="about#vision">Визия</a></li>
+                            <li><a href="about#goals">Цели</a></li>
+                            <li><a href="about#team">Екип</a></li>
+                            <li><a href="about#reviews">Отзиви от родители</a></li>
+                        </ul>
+                    </li>
                     <li class="has-sub">
                         <div class="has-sub-head">
                             <a class="nav-link" href="baby-center">Бебешки център</a>
@@ -199,7 +211,7 @@
         <section class="section section--peach">
             <div class="container">
                 <div class="section-head"><h2 data-edit="16a67fcbd21c">Отзиви от родители</h2></div>
-                <div class="reviews" data-reviews><p class="loading-note">Зареждане...</p></div>
+                <div class="reviews" data-reviews><p class="loading-note">Зареждане<span class="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p></div>
             </div>
         </section>
 
@@ -282,6 +294,6 @@
             <p data-edit="cf2802cd933f">&copy; 2024 Sí bebé. Всички права запазени. <a href="privacy">Политика за поверителност</a></p>
         </div>
     </footer>
-    <script src="assets/js/site.js?v=ca921ade"></script>
+    <script src="assets/js/site.js?v=9b45ebae"></script>
 </body>
 </html>

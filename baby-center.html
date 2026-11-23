@@ -19,7 +19,7 @@
     <meta name="theme-color" content="#FFF8F1">
     <link rel="icon" type="image/png" href="assets/img/favicon.png">
     <link rel="stylesheet" href="assets/css/fonts.css">
-    <link rel="stylesheet" href="assets/css/style.css?v=2bed21db">
+    <link rel="stylesheet" href="assets/css/style.css?v=b4f022b4">
     <link rel="preload" href="assets/fonts/nunito-cyrillic-TMnFcQIG.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/onest-cyrillic-oEoeyxMI.woff2" as="font" type="font/woff2" crossorigin>
     <script>
@@ -41,7 +41,19 @@
             <nav class="nav" id="site-nav" aria-label="Главно меню">
                 <ul class="nav-list">
                     <li><a class="nav-link" href="./">Начало</a></li>
-                    <li><a class="nav-link" href="about">За нас</a></li>
+                    <li class="has-sub">
+                        <div class="has-sub-head">
+                            <a class="nav-link" href="about">За нас</a>
+                            <button type="button" class="sub-toggle" aria-expanded="false" aria-controls="sub-about" aria-label="Покажи разделите"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                        </div>
+                        <ul class="sub-menu" id="sub-about">
+                            <li><a href="about#mission">Мисия</a></li>
+                            <li><a href="about#vision">Визия</a></li>
+                            <li><a href="about#goals">Цели</a></li>
+                            <li><a href="about#team">Екип</a></li>
+                            <li><a href="about#reviews">Отзиви от родители</a></li>
+                        </ul>
+                    </li>
                     <li class="has-sub">
                         <div class="has-sub-head">
                             <a class="nav-link" href="baby-center" aria-current="page">Бебешки център</a>
@@ -222,7 +234,7 @@
         <section class="section section--white" id="services">
             <div class="container">
                 <div class="section-head"><h2 data-edit="cb1c054b4404">Услуги</h2></div>
-                <div class="card-grid card-grid--3">
+                <div class="card-grid card-grid--3 card-grid--center">
                     <article class="card">
                         <span class="icon "><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
                         <h3 data-edit="b23e32bfc6d0">Гледане на дете</h3>
@@ -252,6 +264,11 @@
                         <span class="icon "><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h11v8H8l-4 3z"/><path d="M15 9h5v8l-3-2h-6v-2"/></svg></span>
                         <h3 data-edit="698102b835f2">Консултации</h3>
                         <p data-edit="71a2e5ee342b">Индивидуални срещи с логопед или детски психолог.</p>
+                    </article>
+                    <article class="card">
+                        <span class="icon "><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5-9 5z"/><path d="M7 11.5V16c3 2 7 2 10 0v-4.5"/></svg></span>
+                        <h3 data-edit="c91151a64cfd">Адаптация към ясла и детска градина</h3>
+                        <p data-edit="5c023bbd9b9c">Подготвяме детето постепенно и спокойно за прехода към ясла или детска градина, в партньорство с родителите.</p>
                     </article>
                 </div>
             </div>
@@ -410,6 +427,6 @@
             <p data-edit="cf2802cd933f">&copy; 2024 Sí bebé. Всички права запазени. <a href="privacy">Политика за поверителност</a></p>
         </div>
     </footer>
-    <script src="assets/js/site.js?v=ca921ade"></script>
+    <script src="assets/js/site.js?v=9b45ebae"></script>
 </body>
 </html>

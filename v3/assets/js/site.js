@@ -57,7 +57,7 @@ function initMenu() {
     });
 
     // On desktop the menu also opens on hover, so the arrow must be able to close it too
-    const hoverMenu = window.matchMedia('(hover: hover) and (min-width: 1181px)');
+    const hoverMenu = window.matchMedia('(hover: hover) and (min-width: 1241px)');
     document.querySelectorAll('.sub-toggle').forEach((button) => {
         const item = button.closest('.has-sub');
         button.addEventListener('click', (event) => {
@@ -492,6 +492,30 @@ async function loadArticles() {
         initCardRow(row, '.event', 'статии');
         clampCards(row, '.event-body > p');
         observeReveal(section);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+/* ---------- Questions and answers (Пространство за родители) ---------- */
+async function loadFaq() {
+    const section = document.querySelector('[data-faq-section]');
+    if (!section) return;
+    try {
+        const items = (await fetchContent('faq')).filter((item) => String(item.question || '').trim() && String(item.answer || '').trim());
+        if (!items.length) return;
+        section.querySelector('[data-faq]').innerHTML = items.map((item) => {
+            const answer = String(item.answer).trim().split(/\n\s*\n/)
+                .map((part) => `<p>${escapeHtml(part.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+            return `
+                <details class="faq-item">
+                    <summary>${escapeHtml(String(item.question).trim())}</summary>
+                    <div class="faq-answer">${answer}</div>
+                </details>`;
+        }).join('');
+        section.hidden = false;
+        observeReveal(section);
+        if (location.hash === '#faq') section.scrollIntoView();
     } catch (error) {
         console.error(error);
     }
@@ -1181,7 +1205,7 @@ function initPrivacyDialog() {
                 <h2 id="policy-title">Политика за поверителност</h2>
                 <button type="button" class="policy-close" aria-label="Затвори">${ICONS.close}</button>
             </div>
-            <div class="policy-body legal" tabindex="-1"><p class="loading-note">Зареждане...</p></div>
+            <div class="policy-body legal" tabindex="-1"><p class="loading-note">Зареждане<span class="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p></div>
             <div class="policy-foot">
                 <button type="button" class="btn btn--ghost" data-policy-close>Затвори</button>
                 <button type="button" class="btn" data-policy-accept>Запознат/а съм</button>
@@ -1292,6 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form[data-form]').forEach(initForm);
     loadReviews();
     loadArticles();
+    loadFaq();
     loadEvents();
     loadTeam();
     loadGallery();
