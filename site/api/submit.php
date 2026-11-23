@@ -20,6 +20,15 @@ if (!empty($_POST['website'])) {
     json_out(['ok' => true]);
 }
 
+// The form must come from a page served by this site, and take a person at least a few seconds
+$age = form_token_age($_POST['ft'] ?? null);
+if ($age === null || $age > FORM_MAX_SECONDS) {
+    json_out(['ok' => false, 'error' => 'Моля, презаредете страницата и изпратете формата отново.'], 400);
+}
+if ($age < FORM_MIN_SECONDS) {
+    json_out(['ok' => true]); // too fast for a person: answer as if saved, store nothing
+}
+
 $form = is_string($_POST['form'] ?? null) ? $_POST['form'] : '';
 $errors = [];
 $required = function (string $key, int $max = 100) use (&$errors): string {

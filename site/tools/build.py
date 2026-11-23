@@ -185,6 +185,10 @@ def footer():
                 <ul class="footer-phones">
 {phones}
                 </ul>
+                <h3>Имейл</h3>
+                <ul class="footer-phones">
+                        <li><a href="mailto:{EMAIL}">{svg("mail", 16, 2)} {EMAIL}</a></li>
+                </ul>
                 <a class="btn btn--light" href="contact.html#booking">Запиши час</a>
             </div>
         </div>
@@ -1125,6 +1129,13 @@ def mark_editable(html):
         return f'<{tag}{attrs} data-edit="{text_key(inner)}">{inner}</{tag}>'
 
     html = EDITABLE.sub(mark, html)
+
+    # Daily routine rows: the time and the text are edited separately
+    def mark_row(m):
+        return (f'<li{m.group(1)}><time data-edit="{text_key(m.group(2))}">{m.group(2)}</time>'
+                f'<span data-edit="{text_key(m.group(3))}">{m.group(3)}</span></li>')
+
+    html = re.sub(r'<li([^>]*)><time>([^<]+)</time><span>([^<]+)</span></li>', mark_row, html)
     return re.sub(r'\x00(\d+)\x00', lambda m: zones[int(m.group(1))], html)
 
 

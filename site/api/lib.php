@@ -271,6 +271,27 @@ function purge_old_data(): void
     $pdo->exec("DELETE FROM hits WHERE created_at < (NOW() - INTERVAL 1 DAY)");
 }
 
+/* Signed time stamp put into the forms when the page is served. Bots that post straight to submit.php
+   have none, and ones that fill the form in a split second are too fast for a person. */
+const FORM_MIN_SECONDS = 4;
+const FORM_MAX_SECONDS = 172800; // two days
+
+function form_token(): string
+{
+    $time = (string) time();
+    return $time . '.' . substr(hash_hmac('sha256', 'form|' . $time, (string) (config()['secret'] ?? 'sibebe')), 0, 24);
+}
+
+/* Seconds since the form was served, or null when the stamp is missing or forged */
+function form_token_age(mixed $token): ?int
+{
+    if (!is_string($token) || !preg_match('/^(\d{10})\.([a-f0-9]{24})$/', $token, $m)) {
+        return null;
+    }
+    $expected = substr(hash_hmac('sha256', 'form|' . $m[1], (string) (config()['secret'] ?? 'sibebe')), 0, 24);
+    return hash_equals($expected, $m[2]) ? time() - (int) $m[1] : null;
+}
+
 /* Rate limiting without storing IP addresses: only a salted hash, kept for one day. */
 function ip_hash(): string
 {
@@ -557,7 +578,7 @@ function delete_upload(?string $path): void
 /* ---------- Texts edited on the page ---------- */
 // Saved texts live in the settings table as "text:<key>"; api/texts.php is a cache that render.php reads.
 const TEXT_CACHE = __DIR__ . '/texts.php';
-const TEXT_TAGS = 'h1|h2|h3|h4|p|li|figcaption|span';
+const TEXT_TAGS = 'h1|h2|h3|h4|p|li|figcaption|span|time';
 
 /* ['texts' => [key => html], 'replace' => [old link => new link]] */
 function text_overrides(): array
