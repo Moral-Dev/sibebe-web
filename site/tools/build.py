@@ -471,7 +471,7 @@ def build_home():
             </div>
         </section>
 
-        <section class="section section--white" data-events-section hidden>
+        <section class="section section--white" id="events" data-events-section hidden>
             <div class="container">
                 <div class="events-group" data-events-group="upcoming" hidden>
                     <h2>Предстоящи събития</h2>
@@ -796,9 +796,12 @@ def build_academy():
              ('expert', 'Срещи с експерти', 'Педиатри, консултанти по сън и захранване.'),
              ('chat', 'Родителска общност', 'Дискусионен клуб за обмен на опит.'),
              ('book', 'Блог', 'Статии на тема здраве, възпитание и игри у дома.')]
-    cards = '\n'.join(f'''                    <article class="card">
+    links = {'Събития': 'index.html#events'}  # cards that lead somewhere (the whole card is clickable)
+    # The link stays switched off until the script finds at least one event
+    title = lambda t: f'<a class="card-link" href="{links[t]}" data-needs-events tabindex="-1" aria-disabled="true">{t} {svg("arrow", 18, 2.5)}</a>' if t in links else t
+    cards = '\n'.join(f'''                    <article class="card{' card--link' if t in links else ''}">
                         {icon(ic, 'icon--gold' if i % 2 else 'icon--sage')}
-                        <h3>{t}</h3>
+                        <h3>{title(t)}</h3>
                         <p>{x}</p>
                     </article>''' for i, (ic, t, x) in enumerate(items))
     body = f'''{intro('Пространство за родители', 'academy-intro', 'Възпитателка играе с две малки деца на масичка с дървени играчки', subtitle='Вашето място за въпроси и отговори', lead='<p class="lead">Тук не сте сами в предизвикателствата на родителството.</p>')}

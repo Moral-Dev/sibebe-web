@@ -459,6 +459,7 @@ async function loadEvents() {
         fill('past', past);
         section.hidden = !(upcoming.length || past.length);
         observeReveal(section);
+        if (location.hash === '#events') jumpTo(section);
     } catch (error) {
         console.error(error);
     }
@@ -497,6 +498,33 @@ async function loadArticles() {
     }
 }
 
+/* A section that appears after loading, opened with a link like index#events: go to it, and keep it in place
+   while other sections above are still loading, until the visitor scrolls by themselves */
+function jumpTo(target) {
+    const go = () => target.scrollIntoView({ behavior: 'instant', block: 'start' });
+    go();
+    const observer = new ResizeObserver(go);
+    observer.observe(document.body);
+    const stop = () => {
+        observer.disconnect();
+        ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach((type) => window.removeEventListener(type, stop));
+    };
+    ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach((type) => window.addEventListener(type, stop, { passive: true }));
+    setTimeout(stop, 3000);
+}
+
+/* Links to the events on the home page work only while there are events to show */
+async function enableEventLinks() {
+    const links = document.querySelectorAll('[data-needs-events]');
+    if (!links.length) return;
+    try {
+        if (!(await fetchContent('events')).length) return;
+        links.forEach((link) => { link.removeAttribute('aria-disabled'); link.removeAttribute('tabindex'); });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 /* ---------- Questions and answers (Пространство за родители) ---------- */
 async function loadFaq() {
     const section = document.querySelector('[data-faq-section]');
@@ -515,7 +543,7 @@ async function loadFaq() {
         }).join('');
         section.hidden = false;
         observeReveal(section);
-        if (location.hash === '#faq') section.scrollIntoView();
+        if (location.hash === '#faq') jumpTo(section);
     } catch (error) {
         console.error(error);
     }
@@ -1317,6 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadReviews();
     loadArticles();
     loadFaq();
+    enableEventLinks();
     loadEvents();
     loadTeam();
     loadGallery();

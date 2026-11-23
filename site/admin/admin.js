@@ -511,3 +511,6 @@
     });
     document.addEventListener('input', function (e) { if (e.target.classList) e.target.classList.remove('is-invalid'); });
 })();
+
+// Long side menu: keep the open page's item in view
+document.querySelector('.sidebar nav a[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
