@@ -1286,3 +1286,13 @@ img.logo-show { animation: logo-show .7s var(--spring) both; }
 .card-grid--center > * { flex: 0 0 calc((100% - 52px) / 3); }
 @media (max-width: 980px) { .card-grid--center > * { flex-basis: calc((100% - 26px) / 2); } }
 @media (max-width: 640px) { .card-grid--center > * { flex-basis: 100%; } }
+
+/* Card that leads somewhere: the title link covers the whole card */
+.card--link > h3 { position: static; }
+.card-link { color: inherit; display: inline-flex; align-items: center; gap: 8px; }
+.card-link::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
+.card-link[aria-disabled="true"] { pointer-events: none; }
+.card-link[aria-disabled="true"]::before, .card-link[aria-disabled="true"] svg { display: none; }
+.card-link svg { color: var(--plum); transition: transform .35s var(--ease); }
+.card--link:hover .card-link:not([aria-disabled]) { color: var(--plum); }
+.card--link:hover .card-link:not([aria-disabled]) svg { transform: translateX(5px); }
