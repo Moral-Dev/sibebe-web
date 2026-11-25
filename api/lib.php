@@ -1,0 +1,984 @@
+<?php
+/* SI BEBE – shared helpers for the public API and the admin panel. */
+
+declare(strict_types=1);
+
+const RETENTION_DAYS = 365;          // Form submissions are deleted after one year (privacy policy)
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const UPLOAD_DIR = __DIR__ . '/../uploads';
+// The first categories; after that they are managed in the admin panel (table gallery_categories)
+const GALLERY_CATEGORIES = [
+    'workshops' => 'Тематични работилнички',
+    'activities' => 'Занимания',
+    'events' => 'Събития',
+    'interior' => 'Интериор',
+];
+// While this file exists only logged-in admins see the site (see render.php and .htaccess)
+const MAINTENANCE_FLAG = __DIR__ . '/../maintenance.flag';
+const CHILD_AGES = ['0–6 месеца', '6–12 месеца', '12–24 месеца', '24–36 месеца'];
+
+/* Admin session, shared by the admin panel and the on-page editor (api/edit.php). */
+function is_https(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+}
+
+function start_admin_session(): void
+{
+    $https = is_https();
+    // Own session folder outside the public site, so shared-hosting cleanup does not log the admin out mid-edit
+    $dir = dirname(__DIR__, 2) . '/sibebe_sessions';
+    if ((is_dir($dir) || @mkdir($dir, 0700)) && is_writable($dir)) {
+        session_save_path($dir);
+    }
+    ini_set('session.gc_maxlifetime', '28800');
+    // An older version kept the session under /admin only; drop that cookie so it cannot shadow this one
+    if (isset($_COOKIE['sibebe_admin'])) {
+        setcookie('sibebe_admin', '', ['expires' => time() - 3600, 'path' => '/admin']);
+    }
+    session_name('sibebe_session');
+    session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => $https, 'httponly' => true, 'samesite' => 'Strict']);
+    session_start();
+    // A deleted admin must not keep working with an old session
+    if (!empty($_SESSION['admin']) && config()) {
+        try {
+            $stmt = db()->prepare('SELECT 1 FROM admins WHERE username = ?');
+            $stmt->execute([$_SESSION['admin']]);
+            if (!$stmt->fetchColumn()) {
+                $_SESSION = [];
+            }
+        } catch (Throwable $e) {
+            // database down: leave the session alone, the page shows its own error
+        }
+    }
+}
+
+/* Readable marker so the public pages only ask about edit mode when someone has logged in on this browser. */
+function set_editor_marker(bool $on): void
+{
+    $https = is_https();
+    setcookie('sibebe_editor', $on ? '1' : '', ['expires' => $on ? 0 : time() - 3600, 'path' => '/', 'secure' => $https, 'httponly' => false, 'samesite' => 'Strict']);
+}
+
+function config(): array
+{
+    static $config = null;
+    if ($config === null) {
+        $file = __DIR__ . '/config.php';
+        $config = is_file($file) ? require $file : [];
+    }
+    return $config;
+}
+
+function db(): PDO
+{
+    static $pdo = null;
+    if ($pdo === null) {
+        $c = config();
+        if (!$c) {
+            throw new RuntimeException('Not configured');
+        }
+        $pdo = connect_db($c['db_host'], $c['db_name'], $c['db_user'], $c['db_pass']);
+    }
+    return $pdo;
+}
+
+date_default_timezone_set('Europe/Sofia');
+
+function connect_db(string $host, string $name, string $user, string $pass): PDO
+{
+    $pdo = new PDO("mysql:host={$host};dbname={$name};charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
+    // Dates in the database follow Bulgarian time, like PHP
+    $pdo->exec("SET time_zone = '" . (new DateTime())->format('P') . "'");
+    return $pdo;
+}
+
+// Team members shown on the About page (added after the first release, so also created on demand)
+const TEAM_TABLE = "CREATE TABLE IF NOT EXISTS team (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            role VARCHAR(160) NOT NULL DEFAULT '',
+            bio TEXT NULL,
+            photo VARCHAR(255) NULL,
+            sort INT NOT NULL DEFAULT 0,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+const ARTICLES_TABLE = "CREATE TABLE IF NOT EXISTS articles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(190) NOT NULL,
+            description TEXT NOT NULL,
+            image VARCHAR(190) NULL,
+            link VARCHAR(500) NULL,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+const FAQ_TABLE = "CREATE TABLE IF NOT EXISTS faq (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            question VARCHAR(300) NOT NULL,
+            answer TEXT NOT NULL,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+const GALLERY_CAT_TABLE = "CREATE TABLE IF NOT EXISTS gallery_categories (
+            slug VARCHAR(60) PRIMARY KEY,
+            label VARCHAR(80) NOT NULL,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+/* Gallery categories in display order: [slug => label]. Created and filled with the first ones on demand. */
+function gallery_categories(): array
+{
+    static $cats = null;
+    if ($cats === null) {
+        db()->exec(GALLERY_CAT_TABLE);
+        $rows = db()->query("SELECT slug, label FROM gallery_categories ORDER BY sort, label")->fetchAll(PDO::FETCH_KEY_PAIR);
+        if (!$rows && setting('gallery_categories_seeded') === null) {
+            $stmt = db()->prepare("INSERT INTO gallery_categories (slug, label, sort) VALUES (?, ?, ?)");
+            $i = 0;
+            foreach (GALLERY_CATEGORIES as $slug => $label) {
+                $stmt->execute([$slug, $label, ++$i]);
+            }
+            set_setting('gallery_categories_seeded', '1');
+            $rows = GALLERY_CATEGORIES;
+        }
+        $cats = $rows;
+    }
+    return $cats;
+}
+
+/* "Коледно парти" -> "koledno-parti", unique among the categories */
+function category_slug(string $label): string
+{
+    $map = ['а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ж'=>'zh','з'=>'z','и'=>'i','й'=>'y','к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o','п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f','х'=>'h','ц'=>'ts','ч'=>'ch','ш'=>'sh','щ'=>'sht','ъ'=>'a','ь'=>'y','ю'=>'yu','я'=>'ya'];
+    $slug = strtr(mb_strtolower($label), $map);
+    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $slug), '-') ?: 'kategoria';
+    $slug = rtrim(substr($slug, 0, 24), '-'); // gallery.category holds up to 30 characters, leaving room for -2, -3...
+    $base = $slug;
+    $stmt = db()->prepare("SELECT 1 FROM gallery_categories WHERE slug = ?");
+    for ($n = 2; ; $n++) {
+        $stmt->execute([$slug]);
+        if (!$stmt->fetchColumn()) {
+            return $slug;
+        }
+        $slug = $base . '-' . $n;
+    }
+}
+
+function ensure_team_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(TEAM_TABLE);
+        $done = true;
+    }
+}
+
+/* The articles table came after the first install, so it is created on first use */
+function ensure_articles_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(ARTICLES_TABLE);
+        $done = true;
+    }
+}
+
+function ensure_faq_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        db()->exec(FAQ_TABLE);
+        $done = true;
+    }
+}
+
+function schema(): array
+{
+    return [
+        "CREATE TABLE IF NOT EXISTS admins (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(60) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS bookings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            parent_first_name VARCHAR(100) NOT NULL,
+            parent_last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(190) NOT NULL,
+            phone VARCHAR(40) NOT NULL,
+            child_first_name VARCHAR(100) NOT NULL,
+            child_last_name VARCHAR(100) NOT NULL,
+            child_age VARCHAR(40) NOT NULL,
+            status ENUM('new','handled') NOT NULL DEFAULT 'new',
+            note TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (status), INDEX (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS partners (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            company VARCHAR(190) NOT NULL,
+            email VARCHAR(190) NOT NULL,
+            phone VARCHAR(40) NOT NULL,
+            status ENUM('new','handled') NOT NULL DEFAULT 'new',
+            note TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (status), INDEX (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS reviews (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            author VARCHAR(120) NOT NULL,
+            text TEXT NOT NULL,
+            stars TINYINT NOT NULL DEFAULT 5,
+            visible TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS gallery (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            file VARCHAR(190) NOT NULL,
+            alt VARCHAR(190) NOT NULL DEFAULT '',
+            category VARCHAR(30) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(190) NOT NULL,
+            description TEXT NOT NULL,
+            event_date DATETIME NOT NULL,
+            image VARCHAR(190) NULL,
+            link VARCHAR(500) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX (event_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        TEAM_TABLE,
+        ARTICLES_TABLE,
+        FAQ_TABLE,
+        ROUTINE_TABLE,
+        "CREATE TABLE IF NOT EXISTS settings (
+            name VARCHAR(60) PRIMARY KEY,
+            value TEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS hits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            kind VARCHAR(20) NOT NULL,
+            ip_hash CHAR(64) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX (kind, ip_hash, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    ];
+}
+
+/* Delete what the privacy policy promises to delete. Runs on submits and admin visits. */
+function purge_old_data(): void
+{
+    $pdo = db();
+    foreach (['bookings', 'partners'] as $table) {
+        $pdo->exec("DELETE FROM {$table} WHERE updated_at < (NOW() - INTERVAL " . RETENTION_DAYS . " DAY)");
+    }
+    $pdo->exec("DELETE FROM hits WHERE created_at < (NOW() - INTERVAL 1 DAY)");
+}
+
+/* Signed time stamp put into the forms when the page is served. Bots that post straight to submit.php
+   have none, and ones that fill the form in a split second are too fast for a person. */
+const FORM_MIN_SECONDS = 4;
+const FORM_MAX_SECONDS = 172800; // two days
+
+function form_token(): string
+{
+    $time = (string) time();
+    return $time . '.' . substr(hash_hmac('sha256', 'form|' . $time, (string) (config()['secret'] ?? 'sibebe')), 0, 24);
+}
+
+/* Seconds since the form was served, or null when the stamp is missing or forged */
+function form_token_age(mixed $token): ?int
+{
+    if (!is_string($token) || !preg_match('/^(\d{10})\.([a-f0-9]{24})$/', $token, $m)) {
+        return null;
+    }
+    $expected = substr(hash_hmac('sha256', 'form|' . $m[1], (string) (config()['secret'] ?? 'sibebe')), 0, 24);
+    return hash_equals($expected, $m[2]) ? time() - (int) $m[1] : null;
+}
+
+/* Rate limiting without storing IP addresses: only a salted hash, kept for one day. */
+function ip_hash(): string
+{
+    $salt = config()['secret'] ?? 'sibebe';
+    return hash('sha256', $salt . '|' . ($_SERVER['REMOTE_ADDR'] ?? ''));
+}
+
+function too_many(string $kind, int $limit, int $minutes): bool
+{
+    $stmt = db()->prepare("SELECT COUNT(*) FROM hits WHERE kind = ? AND ip_hash = ? AND created_at > (NOW() - INTERVAL {$minutes} MINUTE)");
+    $stmt->execute([$kind, ip_hash()]);
+    return (int) $stmt->fetchColumn() >= $limit;
+}
+
+function record_hit(string $kind): void
+{
+    db()->prepare("INSERT INTO hits (kind, ip_hash) VALUES (?, ?)")->execute([$kind, ip_hash()]);
+}
+
+function clear_hits(string $kind): void
+{
+    db()->prepare("DELETE FROM hits WHERE kind = ? AND ip_hash = ?")->execute([$kind, ip_hash()]);
+}
+
+function setting(string $name, ?string $default = null): ?string
+{
+    $stmt = db()->prepare("SELECT value FROM settings WHERE name = ?");
+    $stmt->execute([$name]);
+    $value = $stmt->fetchColumn();
+    return $value === false ? $default : $value;
+}
+
+function set_setting(string $name, string $value): void
+{
+    db()->prepare("INSERT INTO settings (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)")->execute([$name, $value]);
+}
+
+/* Where new-request e-mails go: set in the admin panel, falls back to the address from the first setup. */
+function notify_emails(): array
+{
+    $raw = setting('notify_email', config()['notify_email'] ?? '');
+    $list = array_filter(array_map('trim', preg_split('/[,;\s]+/', (string) $raw)));
+    return array_values(array_filter($list, fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL)));
+}
+
+/* Sender address: noreply@ the site's domain, so mail providers trust it. */
+function notify_sender(): string
+{
+    $host = strtolower(preg_replace('/[^a-z0-9.-]/i', '', preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? 'sibebe.bg')));
+    $host = preg_replace('/^www\./', '', $host);
+    return 'noreply@' . (filter_var($host, FILTER_VALIDATE_IP) || $host === 'localhost' || $host === '' ? 'sibebe.bg' : $host);
+}
+
+function send_notification(string $subject, string $body, string $replyTo = ''): bool
+{
+    $to = notify_emails();
+    if (!$to) {
+        return false;
+    }
+    $from = notify_sender();
+    $name = '=?UTF-8?B?' . base64_encode('Sí bebé') . '?=';
+    $headers = "From: {$name} <{$from}>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
+    if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+        $headers .= "\r\nReply-To: {$replyTo}";
+    }
+    // -f sets the envelope sender to the same domain as From, so SPF/DMARC pass and the mail stays out of spam
+    return @mail(implode(', ', $to), '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers, '-f' . $from);
+}
+
+/* True when PHP dropped the whole form because it was over post_max_size. */
+function post_too_large(): bool
+{
+    return $_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0;
+}
+
+function json_out($data, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function clean($value, int $max = 190): string
+{
+    $value = trim(preg_replace('/\s+/u', ' ', is_string($value) ? $value : ''));
+    return mb_substr($value, 0, $max);
+}
+
+/* Like clean(), but keeps paragraphs: for reviews and event descriptions. */
+function clean_text($value, int $max = 2000): string
+{
+    $value = str_replace(["\r\n", "\r"], "\n", is_string($value) ? $value : '');
+    $value = preg_replace('/[^\S\n]+/u', ' ', $value);
+    $value = preg_replace('/ *\n */', "\n", $value);
+    $value = trim(preg_replace('/\n{3,}/', "\n\n", $value));
+    return mb_substr($value, 0, $max);
+}
+
+function h(?string $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+
+/* Checks an uploaded file and returns getimagesize() info. */
+function check_upload(array $file): array
+{
+    $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+    if (in_array($error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        throw new RuntimeException('Снимката е твърде голяма. Максимумът е 12 MB.');
+    }
+    if ($error === UPLOAD_ERR_NO_FILE) {
+        throw new RuntimeException('Не е избрана снимка.');
+    }
+    if ($error !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Снимката не беше качена. Опитайте отново.');
+    }
+    if ($file['size'] > MAX_UPLOAD_BYTES) {
+        throw new RuntimeException('Файлът е по-голям от 12 MB.');
+    }
+    $info = @getimagesize($file['tmp_name']);
+    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+        throw new RuntimeException('Позволени са само снимки JPG, PNG или WEBP.');
+    }
+    if ($info[0] * $info[1] > 40000000) {
+        throw new RuntimeException('Снимката е с твърде голяма резолюция (над 40 мегапиксела). Намалете я и опитайте отново.');
+    }
+    return $info;
+}
+
+/* Loads, turns upright and shrinks a photo with GD. Re-encoding also strips camera data such as GPS. Null without GD. */
+function resized_image(array $file, array $info, int $maxSide)
+{
+    if (!function_exists('imagecreatetruecolor')) {
+        return null;
+    }
+    @ini_set('memory_limit', '256M'); // large phone photos need room while they are decoded
+    $src = match ($info[2]) {
+        IMAGETYPE_JPEG => @imagecreatefromjpeg($file['tmp_name']),
+        IMAGETYPE_PNG => @imagecreatefrompng($file['tmp_name']),
+        IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($file['tmp_name']) : false,
+        default => false,
+    };
+    if (!$src) {
+        return null;
+    }
+    if ($info[2] === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
+        $exif = @exif_read_data($file['tmp_name']);
+        $rotate = [3 => 180, 6 => -90, 8 => 90][$exif['Orientation'] ?? 1] ?? 0;
+        if ($rotate) {
+            $src = imagerotate($src, $rotate, 0);
+        }
+    }
+    [$w, $h] = [imagesx($src), imagesy($src)];
+    $scale = min(1, $maxSide / max($w, $h));
+    $nw = (int) round($w * $scale);
+    $nh = (int) round($h * $scale);
+    $dst = imagecreatetruecolor($nw, $nh);
+    imagealphablending($dst, false);
+    imagesavealpha($dst, true);
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    return $dst;
+}
+
+/* Saves an uploaded image under /uploads with a random name. */
+function save_upload(array $file, int $maxSide = 1800): string
+{
+    $info = check_upload($file);
+    if (!is_dir(UPLOAD_DIR)) {
+        mkdir(UPLOAD_DIR, 0755, true);
+    }
+    $name = date('Ymd') . '-' . bin2hex(random_bytes(6));
+    $img = resized_image($file, $info, $maxSide);
+    if ($img) {
+        if (function_exists('imagewebp') && imagewebp($img, UPLOAD_DIR . "/{$name}.webp", 82)) {
+            return "uploads/{$name}.webp";
+        }
+        if (imagejpeg($img, UPLOAD_DIR . "/{$name}.jpg", 85)) {
+            return "uploads/{$name}.jpg";
+        }
+    }
+    $ext = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'][$info[2]];
+    // Files fetched by the server (Google Drive import) are not uploads, so they are moved with rename()
+    $moved = is_uploaded_file($file['tmp_name']) ? move_uploaded_file($file['tmp_name'], UPLOAD_DIR . "/{$name}.{$ext}") : rename($file['tmp_name'], UPLOAD_DIR . "/{$name}.{$ext}");
+    if (!$moved) {
+        throw new RuntimeException('Файлът не можа да бъде записан.');
+    }
+    return "uploads/{$name}.{$ext}";
+}
+
+/* Replaceable site photos (see api/slots.php). */
+function slots(): array
+{
+    return require __DIR__ . '/slots.php';
+}
+
+/* Writes a new photo over a slot file, keeping its name so the pages need no change. */
+function save_slot(array $file, string $slot): void
+{
+    $slots = slots();
+    if (!isset($slots[$slot])) {
+        throw new RuntimeException('Непознато място за снимка.');
+    }
+    $info = check_upload($file);
+    $target = __DIR__ . '/../' . $slots[$slot]['file'];
+    $ext = pathinfo($target, PATHINFO_EXTENSION);
+    $tmp = $target . '.tmp';
+    $img = resized_image($file, $info, match ($slot) { 'price-list' => 2400, 'share' => 1200, 'logo' => 600, default => 1800 });
+    $ok = false;
+    if ($img) {
+        $ok = $ext === 'webp' && function_exists('imagewebp') ? imagewebp($img, $tmp, 84) : imagejpeg($img, $tmp, 86);
+    } elseif (($ext === 'webp' && $info[2] === IMAGETYPE_WEBP) || ($ext === 'jpg' && $info[2] === IMAGETYPE_JPEG)) {
+        $ok = move_uploaded_file($file['tmp_name'], $tmp);
+    } else {
+        throw new RuntimeException('Сървърът не може да преобразува този формат. Качете снимка във формат ' . strtoupper($ext) . '.');
+    }
+    keep_previous_slot($slot);
+    if (!$ok || !rename($tmp, $target)) {
+        @unlink($tmp);
+        throw new RuntimeException('Снимката не можа да бъде записана.');
+    }
+    set_setting('slot:' . $slot, date('c'));
+}
+
+/* media/logo.prev.webp: the photo that was there before the last change, for "restore previous". */
+function slot_prev_path(string $slot): string
+{
+    $file = __DIR__ . '/../' . slots()[$slot]['file'];
+    return preg_replace('/\.(\w+)$/', '.prev.$1', $file);
+}
+
+function keep_previous_slot(string $slot): void
+{
+    $file = __DIR__ . '/../' . slots()[$slot]['file'];
+    if (is_file($file)) {
+        @copy($file, slot_prev_path($slot));
+    }
+}
+
+/* Swaps the current photo with the previous one, so pressing it again undoes the undo. */
+function undo_slot(string $slot): void
+{
+    $slots = slots();
+    if (!isset($slots[$slot]) || !is_file(slot_prev_path($slot))) {
+        throw new RuntimeException('Няма предишна снимка.');
+    }
+    $file = __DIR__ . '/../' . $slots[$slot]['file'];
+    $prev = slot_prev_path($slot);
+    $tmp = $file . '.swap';
+    if (!copy($file, $tmp) || !copy($prev, $file) || !rename($tmp, $prev)) {
+        @unlink($tmp);
+        throw new RuntimeException('Предишната снимка не можа да бъде върната.');
+    }
+    $default = __DIR__ . '/../' . $slots[$slot]['default'];
+    if (is_file($default) && md5_file($default) === md5_file($file)) {
+        db()->prepare("DELETE FROM settings WHERE name = ?")->execute(['slot:' . $slot]);
+    } else {
+        set_setting('slot:' . $slot, date('c'));
+    }
+}
+
+function reset_slot(string $slot): void
+{
+    $slots = slots();
+    if (!isset($slots[$slot])) {
+        return;
+    }
+    keep_previous_slot($slot);
+    if (!copy(__DIR__ . '/../' . $slots[$slot]['default'], __DIR__ . '/../' . $slots[$slot]['file'])) {
+        throw new RuntimeException('Оригиналната снимка не можа да бъде върната.');
+    }
+    db()->prepare("DELETE FROM settings WHERE name = ?")->execute(['slot:' . $slot]);
+}
+
+function delete_upload(?string $path): void
+{
+    if ($path && preg_match('#^uploads/[\w.-]+$#', $path)) {
+        @unlink(__DIR__ . '/../' . $path);
+    }
+}
+
+
+/* ---------- Daily routine managed in the admin ---------- */
+// Rows live in the routine table; api/routine.php is a cache that render.php reads. Until the table
+// exists the pages keep the routine written by tools/build.py (api/routine_default.php has the same rows).
+const ROUTINE_CACHE = __DIR__ . '/routine.php';
+const ROUTINE_TABLE = "CREATE TABLE IF NOT EXISTS routine (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            time_from VARCHAR(5) NOT NULL,
+            time_to VARCHAR(5) NOT NULL DEFAULT '',
+            text VARCHAR(255) NOT NULL,
+            focus TINYINT(1) NOT NULL DEFAULT 0,
+            on_home TINYINT(1) NOT NULL DEFAULT 0,
+            sort INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+function ensure_routine_table(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo = db();
+    $pdo->exec(ROUTINE_TABLE);
+    // First time: start from the routine that is on the site now
+    if (setting('routine_seeded') === null) {
+        $defaults = is_file(__DIR__ . '/routine_default.php') ? include __DIR__ . '/routine_default.php' : [];
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM routine")->fetchColumn()) {
+            $stmt = $pdo->prepare("INSERT INTO routine (time_from, time_to, text, focus, on_home, sort) VALUES (?, ?, ?, ?, ?, ?)");
+            foreach ($defaults as $i => $row) {
+                $stmt->execute([$row['from'], $row['to'], $row['text'], $row['focus'] ? 1 : 0, $row['home'] ? 1 : 0, $i + 1]);
+            }
+        }
+        set_setting('routine_seeded', '1');
+        rebuild_routine_cache();
+    }
+    $done = true;
+}
+
+function rebuild_routine_cache(): void
+{
+    $rows = db()->query("SELECT time_from, time_to, text, focus, on_home FROM routine ORDER BY sort, id")->fetchAll();
+    $tmp = ROUTINE_CACHE . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    file_put_contents($tmp, "<?php\n// Daily routine from the admin panel. Generated from the database; do not edit.\nreturn " . var_export($rows, true) . ";\n");
+    if (!@rename($tmp, ROUTINE_CACHE)) {
+        @unlink($tmp);
+        throw new RuntimeException('Режимът не можа да бъде записан. Проверете правата на папка api.');
+    }
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(ROUTINE_CACHE, true);
+    }
+}
+
+/* Routine rows for the pages, or null to keep the built-in ones */
+function routine_rows(): ?array
+{
+    if (!is_file(ROUTINE_CACHE)) {
+        try {
+            ensure_routine_table(); // first visit after the update: seed the table and write the cache
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+    $rows = is_file(ROUTINE_CACHE) ? include ROUTINE_CACHE : null;
+    return is_array($rows) && $rows ? $rows : null;
+}
+
+function apply_routine(string $html): string
+{
+    if (!str_contains($html, '<ol class="timeline">') && !str_contains($html, '<ol class="day-strip"')) {
+        return $html;
+    }
+    $rows = routine_rows();
+    if (!$rows) {
+        return $html;
+    }
+    $e = fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    $full = '';
+    $home = '';
+    $homeCount = 0;
+    foreach ($rows as $row) {
+        $time = $row['time_to'] !== '' ? $row['time_from'] . ' – ' . $row['time_to'] : $row['time_from'];
+        $full .= "\n                    <li" . ($row['focus'] ? ' class="is-focus"' : '') . "><time>{$e($time)}</time><span>{$e($row['text'])}</span></li>";
+        if ($row['on_home']) {
+            $home .= "\n                    <li><time>{$e($row['time_from'])}</time><span>{$e($row['text'])}</span></li>";
+            $homeCount++;
+        }
+    }
+    $html = preg_replace_callback('#<ol class="timeline">[\s\S]*?</ol>#', fn () => "<ol class=\"timeline\">{$full}\n                </ol>", $html, 1) ?? $html;
+    if ($homeCount) {
+        $html = preg_replace_callback('#<ol class="day-strip"[^>]*>[\s\S]*?</ol>#', fn () => "<ol class=\"day-strip\" style=\"--n:{$homeCount}\">{$home}\n                </ol>", $html, 1) ?? $html;
+    }
+    return $html;
+}
+
+/* "7.30" or "07:30" -> "07:30"; '' when it is not a time */
+function routine_time(string $value): string
+{
+    if (!preg_match('/^\s*([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\s*$/', $value, $m)) {
+        return '';
+    }
+    return str_pad($m[1], 2, '0', STR_PAD_LEFT) . ':' . $m[2];
+}
+
+/* Routine text with a typographic dash: "занимание - музика" -> "занимание – музика" */
+function routine_text(mixed $value): string
+{
+    return preg_replace('/\s+[-–—]\s+/u', ' – ', clean($value, 255)) ?? '';
+}
+
+/* Pasted routine, one row per line: "07:30 - 09:00 - Прием и закуска" (the end time can be left out) */
+function parse_routine(string $text): array
+{
+    $rows = [];
+    $bad = [];
+    foreach (preg_split('/\R/u', $text) as $n => $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+        if (preg_match('/^(\d{1,2}\s*[:.]\s*\d{2})(?:\s*[-–—]\s*(\d{1,2}\s*[:.]\s*\d{2}))?\s*(?:[-–—:]\s*)?(\S.*)$/u', $line, $m)
+            && ($from = routine_time($m[1])) !== '' && ($m[2] === '' || routine_time($m[2]) !== '')) {
+            $rows[] = ['from' => $from, 'to' => $m[2] === '' ? '' : routine_time($m[2]), 'text' => routine_text($m[3])];
+        } else {
+            $bad[] = $n + 1;
+        }
+    }
+    return [$rows, $bad];
+}
+
+/* ---------- Texts edited on the page ---------- */
+// Saved texts live in the settings table as "text:<key>"; api/texts.php is a cache that render.php reads.
+const TEXT_CACHE = __DIR__ . '/texts.php';
+const TEXT_TAGS = 'h1|h2|h3|h4|p|li|figcaption|span|time';
+
+/* ['texts' => [key => html], 'replace' => [old link => new link]] */
+function text_overrides(): array
+{
+    $cache = is_file(TEXT_CACHE) ? include TEXT_CACHE : null;
+    return is_array($cache) && isset($cache['texts']) ? $cache : ['texts' => [], 'replace' => []];
+}
+
+function rebuild_text_cache(): void
+{
+    $texts = [];
+    $replace = [];
+    foreach (db()->query("SELECT name, value FROM settings WHERE name LIKE 'text:%'") as $row) {
+        $key = substr($row['name'], 5);
+        $texts[$key] = $row['value'];
+        // A changed phone or e-mail also moves every link and copy button that pointed to the old one
+        $kind = text_kind($key);
+        $old = $kind === 'tel' || $kind === 'email' ? original_text($key) : null;
+        if ($old !== null) {
+            $old = html_entity_decode($old, ENT_QUOTES, 'UTF-8');
+            $new = html_entity_decode(strip_tags($row['value']), ENT_QUOTES, 'UTF-8');
+            if ($kind === 'tel') {
+                $replace['href="tel:' . preg_replace('/[^\d+]/', '', $old) . '"'] = 'href="' . phone_href($new) . '"';
+                $replace['href="' . phone_href($old) . '"'] = 'href="' . phone_href($new) . '"';
+            } else {
+                $replace['href="mailto:' . $old . '"'] = 'href="mailto:' . htmlspecialchars($new, ENT_QUOTES, 'UTF-8') . '"';
+                $replace['data-copy="' . $old . '"'] = 'data-copy="' . htmlspecialchars($new, ENT_QUOTES, 'UTF-8') . '"';
+            }
+        }
+    }
+    $tmp = TEXT_CACHE . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    file_put_contents($tmp, "<?php\n// Texts changed on the site. Generated from the database; do not edit.\nreturn " . var_export(['texts' => $texts, 'replace' => $replace], true) . ";\n");
+    if (!@rename($tmp, TEXT_CACHE)) {
+        @unlink($tmp);
+        throw new RuntimeException('Текстът не можа да бъде записан. Проверете правата на папка api.');
+    }
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(TEXT_CACHE, true);
+    }
+}
+
+/* Puts the saved texts into a page before it is sent. */
+function apply_text_overrides(string $html, array $cache): string
+{
+    $texts = $cache['texts'] ?? [];
+    if (!$texts) {
+        return $html;
+    }
+    $html = preg_replace_callback(
+        '#<(' . TEXT_TAGS . ')\b([^>]*\bdata-edit="([a-f0-9]{12})"[^>]*)>([\s\S]*?)</\1>#',
+        fn ($m) => isset($texts[$m[3]]) ? "<{$m[1]}{$m[2]}>{$texts[$m[3]]}</{$m[1]}>" : $m[0],
+        $html
+    ) ?? $html;
+    return $cache['replace'] ? strtr($html, $cache['replace']) : $html;
+}
+
+/* 0879 919 779 -> tel:+359879919779 */
+function phone_href(string $text): string
+{
+    $digits = preg_replace('/[^\d+]/', '', $text);
+    if (str_starts_with($digits, '00')) {
+        $digits = '+' . substr($digits, 2);
+    } elseif (str_starts_with($digits, '0')) {
+        $digits = '+359' . substr($digits, 1);
+    }
+    return 'tel:' . $digits;
+}
+
+/* What kind of text a key is: label, tel or email (buttons and contacts), or '' for normal text. */
+function text_kind(string $key): string
+{
+    foreach (glob(__DIR__ . '/../*.html') ?: [] as $file) {
+        if (preg_match('#\bdata-edit="' . preg_quote($key, '#') . '"\s+data-edit-kind="(\w+)"#', (string) file_get_contents($file), $m)) {
+            return $m[1];
+        }
+    }
+    return '';
+}
+
+/* Buttons and contacts hold plain words only; phones and e-mails are checked. */
+function clean_plain_text(string $html, string $kind): string
+{
+    $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')));
+    if ($kind === 'tel' && strlen(preg_replace('/\D/', '', $text)) < 6) {
+        throw new RuntimeException('Въведете телефонен номер.');
+    }
+    if ($kind === 'email' && !filter_var($text, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Въведете валиден имейл.');
+    }
+    return htmlspecialchars(mb_substr($text, 0, 200), ENT_NOQUOTES, 'UTF-8');
+}
+
+/* The text as it is in the site files, for "restore original". Null when the key is not on any page. */
+function original_text(string $key): ?string
+{
+    if (!preg_match('/^[a-f0-9]{12}$/', $key)) {
+        return null;
+    }
+    foreach (glob(__DIR__ . '/../*.html') ?: [] as $file) {
+        if (preg_match('#<(' . TEXT_TAGS . ')\b[^>]*\bdata-edit="' . $key . '"[^>]*>([\s\S]*?)</\1>#', (string) file_get_contents($file), $m)) {
+            return $m[2];
+        }
+    }
+    return null;
+}
+
+/* Keeps plain text with bold, italic, line breaks and safe links; everything else is removed. */
+function clean_text_html(string $html): string
+{
+    $html = str_replace(["\r", "\n"], ' ', $html);
+    $html = preg_replace('#<(script|style|template)\b[\s\S]*?</\1>#i', '', $html);
+    $html = preg_replace('#<div[^>]*>|</div>|<p[^>]*>|</p>#i', '<br>', $html);
+    $html = strip_tags($html, '<strong><em><b><i><br><a>');
+    $html = preg_replace_callback('#<(/?)(strong|em|b|i|br|a)\b([^>]*)>#i', function ($m) {
+        $tag = strtolower($m[2]);
+        if ($m[1] === '/') {
+            return $tag === 'br' ? '' : "</{$tag}>";
+        }
+        if ($tag === 'a') {
+            if (preg_match('#\bhref\s*=\s*("([^"]*)"|\'([^\']*)\')#i', $m[3], $h)) {
+                $href = html_entity_decode($h[2] !== '' ? $h[2] : ($h[3] ?? ''), ENT_QUOTES, 'UTF-8');
+                if (preg_match('#^(https?://|mailto:|tel:|/|\#|[a-z0-9-]+(\#[\w-]*)?$)#i', $href)) {
+                    return '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">';
+                }
+            }
+            return '<a>';
+        }
+        return "<{$tag}>";
+    }, $html);
+    $html = preg_replace('#(<br>\s*)+$#', '', trim(preg_replace('/\s+/u', ' ', $html)));
+    return mb_substr($html, 0, 5000);
+}
+
+/* One step of history per text: "textprev:<key>" holds what was shown before the last change.
+   ORIGINAL_TEXT marks that the previous version was the text from the site files. */
+const ORIGINAL_TEXT = "__sibebe_original__";
+
+function current_text(string $key): ?string
+{
+    return setting('text:' . $key);
+}
+
+/* Shows $html (null = the original text) and remembers what was there before. */
+function set_text(string $key, ?string $html): void
+{
+    $before = current_text($key);
+    set_setting('textprev:' . $key, $before ?? ORIGINAL_TEXT);
+    if ($html === null) {
+        db()->prepare("DELETE FROM settings WHERE name = ?")->execute(['text:' . $key]);
+    } else {
+        set_setting('text:' . $key, $html);
+    }
+    rebuild_text_cache();
+}
+
+/* The version to go back to, or false when there is none. Null means the original text. */
+function previous_text(string $key)
+{
+    $prev = setting('textprev:' . $key);
+    if ($prev === null) {
+        return false;
+    }
+    return $prev === ORIGINAL_TEXT ? null : $prev;
+}
+
+
+/* ---------- Google Drive import for the gallery ---------- */
+// Works with folders and files shared as "Anyone with the link can view"; no Google account or key needed.
+
+function http_fetch(string $url, int $maxBytes = 26214400): array
+{
+    $headers = ['User-Agent: Mozilla/5.0 (compatible; gallery-import)', 'Accept-Language: bg,en;q=0.8'];
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $body = '';
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 5, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 40,
+            CURLOPT_HTTPHEADER => $headers, CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$body, $maxBytes) {
+                $body .= $chunk;
+                return strlen($body) > $maxBytes ? 0 : strlen($chunk);
+            },
+        ]);
+        curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $type = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+        return [$status, $body, $type];
+    }
+    $context = stream_context_create(['http' => ['header' => implode("\r\n", $headers), 'timeout' => 40, 'follow_location' => 1]]);
+    $body = @file_get_contents($url, false, $context, 0, $maxBytes);
+    $type = '';
+    $status = 0;
+    foreach ($http_response_header ?? [] as $line) {
+        if (preg_match('#^HTTP/\S+ (\d+)#', $line, $m)) {
+            $status = (int) $m[1];
+        } elseif (stripos($line, 'Content-Type:') === 0) {
+            $type = trim(substr($line, 13));
+        }
+    }
+    return [$status, (string) $body, $type];
+}
+
+/* Folder and file ids from pasted Google Drive links. */
+function drive_ids(string $text): array
+{
+    preg_match_all('#/folders/([\w-]{10,})#', $text, $folders);
+    preg_match_all('#(?:/file/d/|[?&]id=)([\w-]{10,})#', $text, $files);
+    return ['folders' => array_values(array_unique($folders[1])), 'files' => array_values(array_unique($files[1]))];
+}
+
+/* The photos in a shared folder: [['id' => ..., 'name' => ...], ...] */
+function drive_folder_files(string $folderId): array
+{
+    [$status, $html] = http_fetch('https://drive.google.com/embeddedfolderview?id=' . rawurlencode($folderId), 5000000);
+    if ($status !== 200 || !str_contains($html, 'flip-entry')) {
+        throw new RuntimeException('Папката не може да бъде отворена. Проверете, че е споделена като „Всеки с линка“.');
+    }
+    $files = [];
+    preg_match_all('#<div class="flip-entry" id="entry-([\w-]+)"[\s\S]*?<a href="([^"]*)"[\s\S]*?<div class="flip-entry-title">([^<]*)</div>#', $html, $m, PREG_SET_ORDER);
+    foreach ($m as $entry) {
+        if (str_contains($entry[2], '/folders/')) {
+            continue; // subfolders are not opened
+        }
+        $files[] = ['id' => $entry[1], 'name' => html_entity_decode($entry[3], ENT_QUOTES, 'UTF-8')];
+    }
+    return $files;
+}
+
+/* Downloads one shared Drive photo and stores it like an upload. Returns the uploads/... path. */
+function import_drive_photo(string $fileId): string
+{
+    if (!preg_match('/^[\w-]{10,}$/', $fileId)) {
+        throw new RuntimeException('Невалиден линк.');
+    }
+    @set_time_limit(120);
+    $body = '';
+    foreach (['https://drive.usercontent.google.com/download?export=download&id=', 'https://drive.google.com/uc?export=download&id='] as $base) {
+        [$status, $body, $type] = http_fetch($base . rawurlencode($fileId));
+        if ($status === 200 && str_starts_with(strtolower($type), 'image/')) {
+            break;
+        }
+        $body = '';
+    }
+    if ($body === '') {
+        throw new RuntimeException('Снимката не може да бъде изтеглена (може да не е споделена или да не е снимка).');
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'drv');
+    file_put_contents($tmp, $body);
+    try {
+        return save_upload(['name' => $fileId, 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => strlen($body)]);
+    } finally {
+        @unlink($tmp);
+    }
+}
+

@@ -1,0 +1,8 @@
+# Uploaded photos only: scripts are never run from this folder
+Options -Indexes
+<FilesMatch "\.(?i:php\d*|phtml|phar|pl|py|cgi|sh|htaccess)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

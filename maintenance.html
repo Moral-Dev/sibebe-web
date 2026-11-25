@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Sí bebé – очаквайте ни скоро</title>
+    <meta name="description" content="Сайтът на Sí bebé е в процес на обновяване. Очаквайте ни съвсем скоро.">
+    <meta name="theme-color" content="#FFF8F1">
+    <link rel="icon" href="/assets/img/favicon.png">
+    <link rel="stylesheet" href="/assets/css/fonts.css">
+    <style>
+        :root { --ink: #2C104E; --plum: #5B3E96; --plum-700: #46297E; --text: #5A5470; --cream: #FFF8F1; --peach-500: #FF9F7E; --mint-500: #74C7A4; --butter-500: #FFCD57; --lav-500: #C2AAF0; --ease: cubic-bezier(.22, 1, .36, 1); }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0; display: grid; place-items: center; padding: 32px 16px; overflow: hidden;
+            background: radial-gradient(circle at 85% 10%, #F3EDFC 0, transparent 45%), radial-gradient(circle at 10% 90%, #FFE6D9 0, transparent 45%), var(--cream);
+            color: var(--text); font: 17px/1.7 Onest, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased;
+            font-feature-settings: "locl" 0; text-align: center;
+        }
+        main { position: relative; z-index: 1; max-width: 560px; animation: rise .9s var(--ease) both; }
+        .logo { display: block; width: 104px; height: 104px; margin: 0 auto 28px; border-radius: 50%; object-fit: contain; box-shadow: 0 22px 44px -22px rgba(44, 16, 78, .4); animation: float 6s ease-in-out infinite; }
+        h1 { margin: 0 0 16px; color: var(--ink); font: 800 clamp(1.9rem, 6vw, 2.8rem)/1.15 Nunito, system-ui, sans-serif; letter-spacing: -.01em; }
+        p { margin: 0 0 12px; font-size: 1.08rem; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 10px; margin-top: 22px; padding: 14px 26px; border-radius: 999px;
+            background: var(--plum); color: #fff; font: 800 1rem Nunito, system-ui, sans-serif; text-decoration: none;
+            box-shadow: 0 14px 30px -12px rgba(91, 62, 150, .7); transition: transform .3s var(--ease), background-color .25s;
+        }
+        .btn:hover { background: var(--plum-700); transform: translateY(-2px); }
+        .btn:focus-visible { outline: 3px solid var(--plum); outline-offset: 3px; }
+        .btn svg { width: 20px; height: 20px; }
+        .deco { position: fixed; z-index: 0; pointer-events: none; animation: float 8s ease-in-out infinite; }
+        .deco--1 { top: 12%; left: 12%; width: 42px; color: var(--butter-500); }
+        .deco--2 { bottom: 14%; right: 12%; width: 60px; color: var(--peach-500); animation-delay: -3s; }
+        .deco--3 { top: 18%; right: 16%; width: 30px; color: var(--mint-500); animation-delay: -5s; }
+        .deco--4 { bottom: 20%; left: 16%; width: 36px; color: var(--lav-500); animation-delay: -2s; }
+        @keyframes float { 50% { transform: translateY(-12px) rotate(6deg); } }
+        @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+        @media (max-width: 600px) { .deco--3, .deco--4 { display: none; } .deco--1 { top: 6%; left: 6%; } .deco--2 { bottom: 5%; right: 6%; } }
+        @media (prefers-reduced-motion: reduce) { main, .logo, .deco { animation: none; } }
+    </style>
+</head>
+<body>
+    <svg class="deco deco--1" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.6l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="currentColor"/></svg>
+    <svg class="deco deco--2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>
+    <svg class="deco deco--3" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8.5-5.3-8.5-11.6A4.7 4.7 0 0 1 12 6.6a4.7 4.7 0 0 1 8.5 2.8C20.5 15.7 12 21 12 21z" fill="currentColor"/></svg>
+    <svg class="deco deco--4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A9 9 0 0 1 9.4 3.5a9 9 0 1 0 11.1 11.1z" fill="currentColor"/></svg>
+    <main>
+        <img class="logo" src="/media/logo.webp" alt="Sí bebé" width="104" height="104">
+        <h1>Сайтът ни е в процес на обновяване</h1>
+        <p>В момента работим по създаването на нашия уебсайт.</p>
+        <p>Очаквайте ни съвсем скоро. Благодарим ви за търпението!</p>
+        <a class="btn" href="https://www.facebook.com/profile.php?id=61555541437681" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.6-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.9v3h2.6V21z"/></svg>
+            Следвайте ни във Facebook
+        </a>
+    </main>
+</body>
+</html>

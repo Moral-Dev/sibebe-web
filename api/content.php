@@ -1,0 +1,54 @@
+<?php
+/* Public content for the site: reviews, gallery, events, team. GET ?type=... */
+
+declare(strict_types=1);
+require __DIR__ . '/lib.php';
+
+try {
+    $type = $_GET['type'] ?? '';
+    $pdo = db();
+    switch ($type) {
+        case 'reviews':
+            $rows = $pdo->query("SELECT author, text, stars FROM reviews WHERE visible = 1 ORDER BY created_at DESC, id DESC")->fetchAll();
+            foreach ($rows as &$row) {
+                $row['stars'] = (int) $row['stars'];
+            }
+            json_out($rows);
+
+        case 'gallery':
+            json_out($pdo->query("SELECT file AS url, alt, category FROM gallery ORDER BY created_at DESC, id DESC")->fetchAll());
+
+        case 'events':
+            $rows = $pdo->query("SELECT title, description, event_date, image, link FROM events ORDER BY event_date DESC")->fetchAll();
+            $now = new DateTimeImmutable();
+            json_out(array_map(fn ($row) => [
+                'title' => $row['title'],
+                'description' => $row['description'],
+                'date' => (new DateTimeImmutable($row['event_date']))->format('c'),
+                'image' => $row['image'],
+                'link' => $row['link'],
+                'past' => new DateTimeImmutable($row['event_date']) < $now,
+            ], $rows));
+
+        case 'articles':
+            ensure_articles_table();
+            json_out($pdo->query("SELECT title, description, image, link FROM articles WHERE visible = 1 ORDER BY created_at DESC, id DESC")->fetchAll());
+
+        case 'faq':
+            ensure_faq_table();
+            json_out($pdo->query("SELECT question, answer FROM faq WHERE visible = 1 ORDER BY sort, id")->fetchAll());
+
+        case 'categories':
+            json_out(array_map(fn ($slug, $label) => ['key' => $slug, 'label' => $label], array_keys(gallery_categories()), gallery_categories()));
+
+        case 'team':
+            ensure_team_table();
+            json_out($pdo->query("SELECT name, role, bio, photo FROM team WHERE visible = 1 ORDER BY sort, id")->fetchAll());
+
+        default:
+            json_out(['error' => 'Unknown type'], 400);
+    }
+} catch (Throwable $e) {
+    error_log('SI BEBE content: ' . $e->getMessage());
+    json_out(['error' => 'Unavailable'], 503);
+}
