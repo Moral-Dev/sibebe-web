@@ -375,7 +375,23 @@ function initCardRow(box, cardSelector, label) {
     };
     prev.addEventListener('click', () => box.scrollBy({ left: -step() }));
     next.addEventListener('click', () => box.scrollBy({ left: step() }));
-    box.addEventListener('scroll', update, { passive: true });
+    // When the scrolling stops between two cards (some browsers and trackpads ignore the snap points),
+    // finish the move to the nearest whole card so no card stays cut in half at the edge
+    let settle;
+    const align = () => {
+        const cards = [...box.querySelectorAll(cardSelector)];
+        const max = box.scrollWidth - box.clientWidth;
+        if (cards.length < 2 || max <= 2) return;
+        const first = cards[0].offsetLeft;
+        const stops = cards.map((card) => Math.min(card.offsetLeft - first, max));
+        const target = stops.reduce((best, stop) => (Math.abs(stop - box.scrollLeft) < Math.abs(best - box.scrollLeft) ? stop : best));
+        if (Math.abs(target - box.scrollLeft) > 2) box.scrollTo({ left: target });
+    };
+    box.addEventListener('scroll', () => {
+        update();
+        clearTimeout(settle);
+        settle = setTimeout(align, 180);
+    }, { passive: true });
     if ('ResizeObserver' in window) new ResizeObserver(update).observe(box);
     else window.addEventListener('resize', update);
     update();
